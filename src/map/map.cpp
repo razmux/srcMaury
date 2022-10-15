@@ -90,7 +90,6 @@ char vending_items_table[32] = "vending_items";
 char market_table[32] = "market";
 char roulette_table[32] = "db_roulette";
 char guild_storage_log_table[32] = "guild_storage_log";
-char char_table[32] = "char"; // [CreativeSD]: Autovend char table
 
 // log database
 char log_db_ip[64] = "127.0.0.1";
@@ -1587,34 +1586,6 @@ int map_get_new_object_id(void)
 	return i;
 }
 
-int map_get_new_bl_id(void)
-{
-	static int last_object_id = END_ACCOUNT_NUM - 1;
-	int i;
-
-	// find a free id
-	i = last_object_id + 1;
-	while (i != last_object_id) {
-		if (i == END_ACCOUNT_NUM + END_ACCOUNT_NUM)
-			i = END_ACCOUNT_NUM;
-
-		if (!idb_exists(id_db, i))
-			break;
-
-		++i;
-	}
-
-	if (i == last_object_id) {
-		ShowError("map_addobject: no free object id!\n");
-		return 0;
-	}
-
-	// update cursor
-	last_object_id = i;
-
-	return i;
-}
-
 /*==========================================
  * Timered function to clear the floor (remove remaining item)
  * Called each flooritem_lifetime ms
@@ -1944,7 +1915,7 @@ int map_addflooritem_area(struct block_list* bl, int16 m, int16 x, int16 y, int 
 			map_search_freecell(NULL, m, &mx, &my, range, range, 1);
 		}
 
-		count += (map_addflooritem(&item_tmp, 1, m, mx, my, 0, 0, 0, 4, 0, 0) != 0) ? 1 : 0;
+		count += (map_addflooritem(&item_tmp, 1, m, mx, my, 0, 0, 0, 4, 0) != 0) ? 1 : 0;
 	}
 
 	return count;
@@ -2017,12 +1988,6 @@ void map_reqnickdb(struct map_session_data * sd, int charid)
 	struct map_session_data* tsd;
 
 	nullpo_retv(sd);
-
-	if (battle_config.universal_reserved_char_id && battle_config.universal_reserved_char_id == charid)
-	{
-		clif_solved_charname(sd->fd, charid, "Universal");
-		return;
-	}
 	
 	if (battle_config.bg_reserved_char_id && battle_config.bg_reserved_char_id == charid)
 	{
@@ -2159,8 +2124,7 @@ int map_quit(struct map_session_data *sd) {
 
 	pc_itemcd_do(sd,false);
 
-	if( !sd->autovend.active )
-		npc_script_event(sd, NPCE_LOGOUT);
+	npc_script_event(sd, NPCE_LOGOUT);
 
 	//Unit_free handles clearing the player related data,
 	//map_quit handles extra specific data which is related to quitting normally
@@ -4314,9 +4278,6 @@ int inter_config_read(const char *cfgName)
 			safestrncpy(sales_table, w2, sizeof(sales_table));
 		else if (strcmpi(w1, "guild_storage_log") == 0)
 			safestrncpy(guild_storage_log_table, w2, sizeof(guild_storage_log_table));
-		// [CreativeSD]: Autovend char table
-		else if (strcmpi(w1, "char_db") == 0)
-			safestrncpy(char_table, w2, sizeof(char_table));
 		else
 		//Map Server SQL DB
 		if(strcmpi(w1,"map_server_ip")==0)

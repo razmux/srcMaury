@@ -33,7 +33,7 @@
 	#define MAX_HOTKEYS 38
 #endif
 
-#define MAX_MAP_PER_SERVER 4000 /// Maximum amount of maps available on a server
+#define MAX_MAP_PER_SERVER 1500 /// Maximum amount of maps available on a server
 #define MAX_INVENTORY 100 ///Maximum items in player inventory
 /** Max number of characters per account. Note that changing this setting alone is not enough if the client is not hexed to support more characters as well.
 * Max value tested was 265 */
@@ -61,7 +61,7 @@
 #define MAX_WALK_SPEED 1000 ///Max walk speed
 #define MAX_STORAGE 600 ///Max number of storage slots a player can have
 #define MAX_GUILD_STORAGE 600 ///Max number of storage slots a guild
-#define MAX_PARTY 22 ///Max party member
+#define MAX_PARTY 12 ///Max party member
 #define MAX_GUILD 16+10*6	///Increased max guild members +6 per 1 extension levels [Lupus]
 #define MAX_GUILDPOSITION 20	///Increased max guild positions to accomodate for all members [Valaris] (removed) [PoW]
 #define MAX_GUILDEXPULSION 32 ///Max Guild expulsion
@@ -483,6 +483,7 @@ struct s_killrank {
 	int score;
 };
 
+// Extended Feature [Easycore]
 struct s_battleground_stats {
 	unsigned int
 		top_damage,
@@ -593,7 +594,6 @@ struct s_woestats {
 		spiritb_used,
 		ammo_used;
 	int points, showstats;
-
 };
 
 struct s_skillcount {
@@ -1175,9 +1175,9 @@ enum e_rank {
 	RANK_ALCHEMIST = 1,
 	RANK_TAEKWON = 2,
 	RANK_KILLER = 3,
-	RANK_PVP = 4,
-	RANK_BG = 5,
-	RANK_WOE = 6,
+	RANK_BG = 4,
+	RANK_WOE = 5,
+	RANK_PVP = 6
 };
 
 struct clan_alliance {

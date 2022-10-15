@@ -405,8 +405,8 @@ void trade_tradeadditem(struct map_session_data *sd, short index, short amount)
 		clif_tradeitemok(sd, index+2, 1);
 		return;
 	}
-		if( item->card[0] == CARD0_CREATE && (char_id = MakeDWord(item->card[2],item->card[3])) > 0 && (char_id == battle_config.bg_reserved_char_id || char_id == battle_config.woe_reserved_char_id || char_id == battle_config.universal_reserved_char_id) && battle_config.reserved_can_trade ){
-		clif_displaymessage (sd->fd, "Los items especiales de Battleground Woe y Universales no pueden ser tradeados");
+		if( item->card[0] == CARD0_CREATE && (char_id = MakeDWord(item->card[2],item->card[3])) > 0 && (char_id == battle_config.bg_reserved_char_id || char_id == battle_config.woe_reserved_char_id) && !battle_config.bg_can_trade ){
+		clif_displaymessage (sd->fd, "Los items especiales de WOE y BG no pueden ser tradeados");
 		clif_tradeitemok(sd, index+2, 1);
 		return;
 	}

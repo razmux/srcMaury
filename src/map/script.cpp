@@ -6039,6 +6039,8 @@ BUILDIN_FUNC(bg_monster_immunity) {
 	return SCRIPT_CMD_SUCCESS;
 }
 
+// Extended Features BG [Easycore]
+// For now, only used to add statistics
 BUILDIN_FUNC(bg_rankpoints)
 {
 	struct map_session_data *sd;
@@ -21138,6 +21140,17 @@ BUILDIN_FUNC(bg_cleanmap)
 	return 0;
 }
 
+BUILDIN_FUNC(bg_getitem)
+{
+	int bg_id, nameid, amount;
+
+	bg_id = script_getnum(st, 2);
+	nameid = script_getnum(st, 3);
+	amount = script_getnum(st, 4);
+
+	bg_team_getitem(bg_id, nameid, amount);
+	return 0;
+}
 
 BUILDIN_FUNC(bg_getkafrapoints)
 {
@@ -21386,14 +21399,11 @@ BUILDIN_FUNC(rankreset)
 	}else{
 		flag = true;
 	}
-	switch(type){
-case 1:
-	type = RANK_PVP; break;
-case 2:
-	type = RANK_BG; break;
-case 3:
-	type = RANK_BG; break;
-	}
+
+	if (type == 2)
+		type = RANK_BG;
+	else
+		type = RANK_WOE;
 
 	pc_rank_reset(type,flag);
 	return SCRIPT_CMD_SUCCESS;
@@ -26248,7 +26258,7 @@ BUILDIN_FUNC(getitem_map)
 }
 
 BUILDIN_FUNC(title) {
-	const char *NPC_NAME = "^77B727 Retrognarok ^000000";
+	const char *NPC_NAME = "^77B727 Mavis-RO ^000000";
 	char NPC[CHAT_SIZE_MAX];
 	TBL_PC* sd;
 
@@ -26916,304 +26926,6 @@ BUILDIN_FUNC(ChangeBG)
 	}
 }
 
-/* Starts a status effect on the target unit or on the attached player.
- *
- * sc_start_area  <effect_id>,<duration>,<val1>{,<rate>,<flag>,{<unit_id>}};
- * sc_start_area2 <effect_id>,<duration>,<val1>,<val2>{,<rate,<flag>,{<unit_id>}};
- * sc_start_area4 <effect_id>,<duration>,<val1>,<val2>,<val3>,<val4>{,<rate,<flag>,{<unit_id>}};
- * <flag>: enum e_status_change_start_flags
- */
-BUILDIN_FUNC(sc_start_area)
-{
-       TBL_NPC* nd = map_id2nd(st->oid);
-       struct block_list* bl;
-       enum sc_type type;
-       int tick, val1, val2, val3, val4 = 0, rate, flag;
-       char start_type;
-       const char* command = script_getfuncname(st);
-
-       if (strstr(command, "4"))
-               start_type = 4;
-       else if (strstr(command, "2"))
-               start_type = 2;
-       else
-               start_type = 1;
-
-       type = (sc_type)script_getnum(st, 2);
-       tick = script_getnum(st, 3);
-       val1 = script_getnum(st, 4);
-
-       //If from NPC we make default flag 1 to be unavoidable
-       if (nd && nd->bl.id == fake_nd->bl.id)
-               flag = script_hasdata(st, 5 + start_type) ? script_getnum(st, 5 + start_type) : SCSTART_NOTICKDEF;
-       else
-               flag = script_hasdata(st, 5 + start_type) ? script_getnum(st, 5 + start_type) : SCSTART_NOAVOID;
-
-       rate = script_hasdata(st, 4 + start_type) ? min(script_getnum(st, 4 + start_type), 10000) : 10000;
-
-       if (script_hasdata(st, (6 + start_type)))
-               bl = map_id2bl(script_getnum(st, (6 + start_type)));
-       else
-               bl = map_id2bl(st->rid);
-
-       if (tick == 0 && val1 > 0 && type > SC_NONE && type < SC_MAX && status_sc2skill(type) != 0)
-       {// When there isn't a duration specified, try to get it from the skill_db
-               tick = skill_get_time(status_sc2skill(type), val1);
-       }
-
-       if (potion_flag == 1 && potion_target) { //skill.cpp set the flags before running the script, this is a potion-pitched effect.
-               bl = map_id2bl(potion_target);
-               tick /= 2;// Thrown potions only last half.
-               val4 = 1;// Mark that this was a thrown sc_effect
-       }
-
-       if (!bl)
-               return SCRIPT_CMD_SUCCESS;
-
-       switch (start_type) {
-       case 1:
-               map_foreachinrange(status_change_start_sub, bl, 10, BL_CHAR, bl, type, rate, val1, 0, 0, val4, tick, flag);
-               break;
-       case 2:
-               val2 = script_getnum(st, 5);
-               map_foreachinrange(status_change_start_sub, bl, 10, BL_CHAR, bl, type, rate, val1, val2, 0, val4, tick, flag);
-               break;
-       case 4:
-               val2 = script_getnum(st, 5);
-               val3 = script_getnum(st, 6);
-               val4 = script_getnum(st, 7);
-               map_foreachinrange(status_change_start_sub, bl, 10, BL_CHAR, bl, type, rate, val1, val2, val3, val4, tick, flag);
-               break;
-       }
-       return SCRIPT_CMD_SUCCESS;
-}
-
-BUILDIN_FUNC(hateffectmvp) {
-#if PACKETVER >= 20150513
-	struct map_session_data* sd;
-	bool enable;
-	int i, effectID;
-
-	if (!script_rid2sd(sd))
-		return SCRIPT_CMD_FAILURE;
-
-	effectID = script_getnum(st, 2);
-	enable = script_getnum(st, 3) ? true : false;
-	int target = script_hasdata(st, 4) ? script_getnum(st, 4) : AREA;
-
-	if (effectID <= HAT_EF_MIN || effectID >= HAT_EF_MAX) {
-		ShowError("buildin_hateffect: unsupported hat effect id %d\n", effectID);
-		return SCRIPT_CMD_FAILURE;
-	}
-
-	ARR_FIND(0, sd->hatEffectCount, i, sd->hatEffectIDs[i] == effectID);
-
-	if (enable) {
-		if (i < sd->hatEffectCount) {
-			return SCRIPT_CMD_SUCCESS;
-		}
-
-		RECREATE(sd->hatEffectIDs, uint32, sd->hatEffectCount + 1);
-		sd->hatEffectIDs[sd->hatEffectCount] = effectID;
-		sd->hatEffectCount++;
-	}
-	else {
-		if (i == sd->hatEffectCount) {
-			return SCRIPT_CMD_SUCCESS;
-		}
-
-		for (; i < sd->hatEffectCount - 1; i++) {
-			sd->hatEffectIDs[i] = sd->hatEffectIDs[i + 1];
-		}
-
-		sd->hatEffectCount--;
-
-		if (!sd->hatEffectCount) {
-			aFree(sd->hatEffectIDs);
-			sd->hatEffectIDs = NULL;
-		}
-	}
-
-
-	if (!sd->state.connect_new) {
-		clif_hat_effect_singlemvp(sd, effectID, enable);
-	}
-
-#endif
-	return SCRIPT_CMD_SUCCESS;
-}
-
-BUILDIN_FUNC(fstatus)	//
-{
-	TBL_PC* sd = map_charid2sd(script_getnum(st, 2));
-	int icon = script_getnum(st, 3);
-	int time = script_getnum(st, 4);
-	bool state = (script_getnum(st, 5) == 1);
-
-	if (sd == NULL)
-		return SCRIPT_CMD_FAILURE;
-
-	clif_status_change(&sd->bl, icon, state, time, 0, 0, 0);
-
-	return SCRIPT_CMD_SUCCESS;
-}
-
-BUILDIN_FUNC(updatehotkey)
-{
-	TBL_PC *sd;
-	int type,id,lv,pos,j, flag = 0;
-	short i;
-	struct script_data *data;
-
-	if (!script_charid2sd(7,sd))
-		return SCRIPT_CMD_FAILURE;
-
-	type = script_getnum(st,2);
-	if(type < 0 || type > 1){
-		clif_displaymessage(sd->fd, "Update Hotkey failed. Invalid type.");
-		return SCRIPT_CMD_FAILURE;
-	}
-	data = script_getdata(st, 3);
-	get_val(st, data); // Convert into value in case of a variable
-	id = ( data_isstring(data) ? skill_name2id(script_getstr(st,3)) : script_getnum(st,3) );
-	lv = script_getnum(st,4);
-	pos = script_getnum(st,5);
-	if(pos < 0 || pos >= MAX_HOTKEYS){
-		clif_displaymessage(sd->fd, "Update Hotkey failed. Invalid hotkey position.");
-		return SCRIPT_CMD_FAILURE;
-	}
-	if( script_hasdata(st,6) )
-		flag = script_getnum(st,6);
-
-	if(type == 0 && id > 0){ // item
-		ARR_FIND(0, MAX_INVENTORY, i, sd->inventory.u.items_inventory[i].nameid == id);
-		if(i<MAX_INVENTORY){
-			if(sd->inventory.u.items_inventory[i].amount != lv)
-				lv = sd->inventory.u.items_inventory[i].amount;
-		} else
-			lv = 0;
-	} else if(type == 1 && id > 0){ // skill
-		j = pc_checkskill(sd,id);
-		if(j < lv)
-			lv = j;
-	}
-
-	if(flag == 1){ // Delete duplicate on same row
-		i = 0;
-		if(pos >= 0 && pos <= 8){
-			ARR_FIND(0, 9, i, sd->status.hotkeys[i].type == type && sd->status.hotkeys[i].id == id && sd->status.hotkeys[i].lv == lv);
-			if(i < 9){
-				sd->status.hotkeys[i].type = 0;
-				sd->status.hotkeys[i].id = 0;
-				sd->status.hotkeys[i].lv = 0;
-			}
-		} else if(pos >= 9 && pos <= 17){
-			ARR_FIND(9, 18, i, sd->status.hotkeys[i].type == type && sd->status.hotkeys[i].id == id && sd->status.hotkeys[i].lv == lv);
-			if(i < 18){
-				sd->status.hotkeys[i].type = 0;
-				sd->status.hotkeys[i].id = 0;
-				sd->status.hotkeys[i].lv = 0;
-			}
-		} else if(pos >= 18 && pos <= 26){
-			ARR_FIND(18, 27, i, sd->status.hotkeys[i].type == type && sd->status.hotkeys[i].id == id && sd->status.hotkeys[i].lv == lv);
-			if(i < 27){
-				sd->status.hotkeys[i].type = 0;
-				sd->status.hotkeys[i].id = 0;
-				sd->status.hotkeys[i].lv = 0;
-			}
-		}
-#if PACKETVER >= 20090603
-		else if(pos >= 27 && pos <= 35){
-			ARR_FIND(27, 36, i, sd->status.hotkeys[i].type == type && sd->status.hotkeys[i].id == id && sd->status.hotkeys[i].lv == lv);
-			if(i < 36){
-				sd->status.hotkeys[i].type = 0;
-				sd->status.hotkeys[i].id = 0;
-				sd->status.hotkeys[i].lv = 0;
-			}
-		}
-#endif
-#if PACKETVER >= 20090617
-		else if(pos >= 36 && pos < MAX_HOTKEYS){
-			ARR_FIND(36, MAX_HOTKEYS, i, sd->status.hotkeys[i].type == type && sd->status.hotkeys[i].id == id && sd->status.hotkeys[i].lv == lv);
-			if(i < MAX_HOTKEYS){
-				sd->status.hotkeys[i].type = 0;
-				sd->status.hotkeys[i].id = 0;
-				sd->status.hotkeys[i].lv = 0;
-			}
-		}
-#endif
-	} else if(flag == 2){ // Delete duplicate on all rows
-		for(i = 0; i < MAX_HOTKEYS; i++){
-			if(sd->status.hotkeys[i].type == type && sd->status.hotkeys[i].id == id && sd->status.hotkeys[i].lv == lv){
-				sd->status.hotkeys[i].type = 0;
-				sd->status.hotkeys[i].id = 0;
-				sd->status.hotkeys[i].lv = 0;
-			}
-		}
-	}
-
-	sd->status.hotkeys[pos].type = type;
-	sd->status.hotkeys[pos].id = id;
-	sd->status.hotkeys[pos].lv = lv;
-
-	clif_hotkeys_send(sd);
-
-	return SCRIPT_CMD_SUCCESS;
-}
-
-BUILDIN_FUNC(clearhotkeys)
-{
-	TBL_PC *sd;
-	int i;
-
-	if (!script_charid2sd(2,sd))
-		return SCRIPT_CMD_FAILURE;
-
-	for(i=0;i<MAX_HOTKEYS;i++){
-		sd->status.hotkeys[i].type = 0;
-		sd->status.hotkeys[i].id = 0;
-		sd->status.hotkeys[i].lv = 0;
-	}
-	clif_hotkeys_send(sd);
-	return SCRIPT_CMD_SUCCESS;
-}
-
-BUILDIN_FUNC(gethotkeys)
-{
-	TBL_PC *sd;
-	TBL_PC *tsd;
-	int i;
-
-	if( !script_rid2sd(sd) )
-		return SCRIPT_CMD_FAILURE;
-
-	if (!script_charid2sd(2,tsd))
-		return SCRIPT_CMD_FAILURE;
-
-	for(i=0;i<MAX_HOTKEYS;i++){
-		pc_setreg(sd,reference_uid(add_str("@hotkey_type"), i),tsd->status.hotkeys[i].type);
-		pc_setreg(sd,reference_uid(add_str("@hotkey_id"), i),tsd->status.hotkeys[i].id);
-		pc_setreg(sd,reference_uid(add_str("@hotkey_lv"), i),tsd->status.hotkeys[i].lv);
-		pc_setreg(sd,reference_uid(add_str("@hotkey_pos"), i),i);
-	}
-	pc_setreg(sd,add_str("@hotkey_count"),i);
-
-	return SCRIPT_CMD_SUCCESS;
-}
-
-BUILDIN_FUNC(setunmounting) {
-	TBL_PC* sd;
-
-	if (!script_charid2sd(2, sd))
-		return SCRIPT_CMD_FAILURE;
-
-	if (sd->sc.data[SC_ALL_RIDING]) {
-		status_change_end(&sd->bl, SC_ALL_RIDING, INVALID_TIMER); //release mount
-	}
-
-	script_pushint(st, 1);//in both cases, return 1.
-	return SCRIPT_CMD_SUCCESS;
-}
 
 #include "../custom/script.inc"
 
@@ -27263,6 +26975,25 @@ BUILDIN_FUNC(preg_match) {
 #endif
 }
 
+// (^~_~^) Gepard Shield Start
+
+BUILDIN_FUNC(get_unique_id)
+{
+	struct map_session_data* sd;
+
+	if (!script_rid2sd(sd))
+	{
+		script_pushint(st, 0);
+		return SCRIPT_CMD_FAILURE;
+	}
+
+	script_pushint(st, session[sd->fd]->gepard_info.unique_id);
+
+	return SCRIPT_CMD_SUCCESS;
+}
+
+// (^~_~^) Gepard Shield End
+
 /// script command definitions
 /// for an explanation on args, see add_buildin_func
 struct script_function buildin_func[] = {
@@ -27278,8 +27009,6 @@ struct script_function buildin_func[] = {
 	BUILDIN_DEF(mapeventwarp, "ssiisiii"),
 	BUILDIN_DEF(areaeffect, "iii"),
 	BUILDIN_DEF(ChangeBG,""),
-	BUILDIN_DEF(hateffectmvp,"ii?"),
-	BUILDIN_DEF(fstatus,"iiii"),	//
 	// eAmod Codes
 	BUILDIN_DEF(get_playtime,""),
 	BUILDIN_DEF(isPremium,""),
@@ -27291,12 +27020,14 @@ struct script_function buildin_func[] = {
 	// Enchanting - Costume
 	BUILDIN_DEF(successenchant,"iii"),
 	BUILDIN_DEF(failedenchant,"i"),
-	//Events
-	BUILDIN_DEF(setunmounting, "?"),//Oboro
-	BUILDIN_DEF(gethotkeys,"?"),
-	BUILDIN_DEF(updatehotkey,"ivii??"),
-	BUILDIN_DEF(clearhotkeys,"?"),
 //-------------------------------------------------------------
+
+// (^~_~^) Gepard Shield Start
+
+	BUILDIN_DEF(get_unique_id,""),
+
+// (^~_~^) Gepard Shield End
+
 	// NPC interaction
 	BUILDIN_DEF(mes,"s*"),
 	BUILDIN_DEF(next,""),
@@ -27471,9 +27202,6 @@ struct script_function buildin_func[] = {
 	BUILDIN_DEF(sc_start,"iii???"),
 	BUILDIN_DEF2(sc_start,"sc_start2","iiii???"),
 	BUILDIN_DEF2(sc_start,"sc_start4","iiiiii???"),
-        BUILDIN_DEF(sc_start_area, "iii???"),
-        BUILDIN_DEF2(sc_start_area, "sc_start2", "iiii???"),
-        BUILDIN_DEF2(sc_start_area, "sc_start4", "iiiiii???"),
 	BUILDIN_DEF(sc_end,"i?"),
 	BUILDIN_DEF(sc_end_class,"??"),
 	BUILDIN_DEF(getstatus, "i??"),
@@ -27774,6 +27502,7 @@ struct script_function buildin_func[] = {
 	BUILDIN_DEF(bg_team_guildid, "i"),
 	BUILDIN_DEF(bg_team_reveal,"i"),
 	BUILDIN_DEF(bg_team_setquest,"ii"),
+	BUILDIN_DEF(bg_getitem, "iii"),
 	BUILDIN_DEF(bg_getkafrapoints, "ii"),
 	BUILDIN_DEF(bg_item,"ii"),
 	BUILDIN_DEF(bgannounce, "s?????"),

@@ -571,7 +571,6 @@ enum e_config_type : uint32 {
 	CONFIG_HOMUNCULUS_AUTOFEED
 };
 
-
 int clif_setip(const char* ip);
 void clif_setbindip(const char* ip);
 void clif_setport(uint16 port);
@@ -680,7 +679,6 @@ void clif_storageclose(struct map_session_data* sd);
 
 int clif_insight(struct block_list *bl,va_list ap);	// map_forallinmovearea callback
 int clif_outsight(struct block_list *bl,va_list ap);	// map_forallinmovearea callback
-int clif_hideview(struct block_list *bl,va_list ap);	// map_forallinmovearea callback
 
 int clif_insight_tbl2bl(struct block_list *bl,va_list ap); // eAmod
 
@@ -755,7 +753,6 @@ void clif_item_damaged(struct map_session_data* sd, unsigned short position);
 void clif_item_refine_list(struct map_session_data *sd);
 void clif_hat_effects( struct map_session_data* sd, struct block_list* bl, enum send_target target );
 void clif_hat_effect_single( struct map_session_data* sd, uint16 effectId, bool enable );
-void clif_hat_effect_singlemvp( struct map_session_data* sd, uint16 effectId, bool enable );
 
 void clif_item_skill(struct map_session_data *sd,uint16 skill_id,uint16 skill_lv);
 
@@ -852,7 +849,6 @@ void clif_instance_create(unsigned short instance_id, int num);
 void clif_instance_changewait(unsigned short instance_id, int num);
 void clif_instance_status(unsigned short instance_id, unsigned int limit1, unsigned int limit2);
 void clif_instance_changestatus(unsigned int instance_id, int type, unsigned int limit);
-
 
 // Custom Fonts
 void clif_font(struct map_session_data *sd);
@@ -1173,5 +1169,11 @@ void clif_bg_queue_apply_notify(const char *name, struct map_session_data *sd);
 void clif_bg_queue_entry_init(struct map_session_data *sd);
 void clif_bg_queue_lobby_notify(const char *name, struct map_session_data *sd);
 void clig_bg_queue_ack_lobby(bool result, const char *name, const char *lobbyname, struct map_session_data *sd);
+
+// (^~_~^) LGP Start
+
+void clif_gepard_send_lgp_settings(struct map_session_data * sd);
+
+// (^~_~^) LGP End
 
 #endif /* CLIF_HPP */

@@ -298,14 +298,7 @@ void mvptomb_destroy(struct mob_data *md) {
 		aFree(nd);
 	}
 
-	//Actualizamos las variables globales y los label
-	struct map_session_data* sd = (struct map_session_data*)nd;
-	Sql_Query(mmysql_handle, "UPDATE `mapreg` SET `value` = %d WHERE `varname` = '$mvpspawn'", md->spawn->id);
-	Sql_Query(mmysql_handle, "UPDATE `mapreg` SET `value` = %d WHERE `varname` = '$mvpspawngid'", md->bl.id);
-	npc_event(sd, "MVP_Board::OnMvpSpawn", 0);
-
 	md->tomb_nid = 0;
-
 }
 
 /**
@@ -593,7 +586,7 @@ bool mob_ksprotected (struct block_list *src, struct block_list *target)
 		struct map_data *mapdata = map_getmapdata(md->bl.m);
 		char output[128];
 		bool is_boss = (md->status.class_ == CLASS_BOSS);
-	
+		
 		if( mapdata->flag[MF_ALLOWKS] || mapdata_flag_ks(mapdata) )
 			return false; // Ignores GVG, PVP and AllowKS map flags
 
@@ -1140,7 +1133,7 @@ TIMER_FUNC(mob_delayspawn){
 		md->spawn_timer = INVALID_TIMER;
 		mob_spawn(md);
 
-		if( battle_config.mvp_pk && md->state.boss ) 
+		if( md->state.boss ) 
 		map_setmapflag(bl->m, MF_PVP, true);
 	}
 	return 0;
@@ -1231,7 +1224,7 @@ int mob_spawn (struct mob_data *md)
 		md->bl.x = md->spawn->x;
 		md->bl.y = md->spawn->y;
 
-	if(battle_config.mvp_pk && md->spawn->state.boss)
+	if(md->spawn->state.boss)
 	 {
 		char message[128];
 		sprintf (message, "PvP esta activado ahora y ha aparecido %s, tengan cuidado",md->name);
@@ -2577,11 +2570,11 @@ int mob_dead(struct mob_data *md, struct block_list *src, int type)
 		int id,zeny;
 		unsigned int base_exp,job_exp;
 	} pt[DAMAGELOG_SIZE];
-	int i, temp, count, m = md->bl.m, bonusdrop = 0;
+	int i, temp, count, m = md->bl.m;
 	int dmgbltypes = 0;  // bitfield of all bl types, that caused damage to the mob and are elligible for exp distribution
 	unsigned int mvp_damage;
 	t_tick tick = gettick();
-	bool rebirth, homkillonly, droper = false;
+	bool rebirth, homkillonly;
 	char output[255];
 
 	status = &md->status;
@@ -2824,7 +2817,7 @@ int mob_dead(struct mob_data *md, struct block_list *src, int type)
 		struct item_drop_list *dlist = ers_alloc(item_drop_list_ers, struct item_drop_list);
 		struct item_drop *ditem;
 		struct item_data* it = NULL;
-		int drop_rate, bonus_drop_rate = 0;
+		int drop_rate;
 #ifdef RENEWAL_DROP
 		int drop_modifier = mvp_sd    ? pc_level_penalty_mod(md->level - mvp_sd->status.base_level, md->status.class_, md->status.mode, 2)   :
 							second_sd ? pc_level_penalty_mod(md->level - second_sd->status.base_level, md->status.class_, md->status.mode, 2):
@@ -2844,16 +2837,14 @@ int mob_dead(struct mob_data *md, struct block_list *src, int type)
 				continue;
 			if ( !(it = itemdb_exists(md->db->dropitem[i].nameid)) )
 				continue;
+			if (battle_config.randomoption_script && (it->type == IT_WEAPON || it->type == IT_ARMOR ) ) // DarbladErxX, desactivamos los items equipables de los mobs
+				continue;
 			drop_rate = md->db->dropitem[i].p;
 			if (drop_rate <= 0) {
 				if (battle_config.drop_rate0item)
 					continue;
 				drop_rate = 1;
 			}
-
-			droper = true;
-			if( bonusdrop > 0 ) // Regional Bonus Drop
-				bonus_drop_rate = (int)(drop_rate * bonusdrop / 100.);
 
 			// change drops depending on monsters size [Valaris]
 			if (battle_config.mob_size_influence) {
@@ -2892,10 +2883,6 @@ int mob_dead(struct mob_data *md, struct block_list *src, int type)
 				// Now rig the drop rate to never be over 90% unless it is originally >90%.
 				drop_rate = i32max(drop_rate, cap_value(drop_rate_bonus, 0, 9000));
 
-				// attempt to drop the item
-				if( rand() % 10000 >= (drop_rate + bonus_drop_rate) )
-				   continue;
-	
 				if( pc_isPremium(sd) && battle_config.premium_dropboost ) // Incremento de item drop para cuentas premium
 				{
 					drop_rate += (int)(0.5 + (drop_rate * battle_config.premium_dropboost) / 100.);
@@ -2915,12 +2902,6 @@ int mob_dead(struct mob_data *md, struct block_list *src, int type)
 					drop_rate = 1;
 			}
 #endif
-			if(map_getmapflag(m, MF_DROPRATE300))
-				drop_rate = (int)( (drop_rate * 300) / 100. );
-			
-			if(map_getmapflag(m, MF_DROPRATE50))
-				drop_rate = (int)( (drop_rate * 30) / 100. );
-			
 			// attempt to drop the item
 			if (rnd() % 10000 >= drop_rate)
 				continue;
@@ -2953,8 +2934,7 @@ int mob_dead(struct mob_data *md, struct block_list *src, int type)
 			mob_item_drop(md, dlist, ditem, 0, battle_config.finding_ore_rate/10, homkillonly);
 		}
 
-		if( sd && (droper || battle_config.mob_slave_adddrop) )
-		{
+		if(sd) {
 			// process script-granted extra drop bonuses
 			uint16 dropid = 0;
 
@@ -3079,6 +3059,10 @@ int mob_dead(struct mob_data *md, struct block_list *src, int type)
 					if(rnd()%10000 >= temp) //if ==0, then it doesn't drop
 						continue;
 				}
+
+				if ( battle_config.randomoption_script && (i_data->type == IT_WEAPON || i_data->type == IT_ARMOR ) ) // DarbladErxX, desactivamos los items equipables de los mobs
+					continue;
+
 
 				memset(&item,0,sizeof(item));
 				item.nameid=mdrop[i].nameid;
@@ -3236,15 +3220,13 @@ int mob_dead(struct mob_data *md, struct block_list *src, int type)
  	if (battle_config.mvp_tomb_enabled && md->spawn->state.boss)
 	 md->target_id = mvp_sd->bl.id;
 
-	if(battle_config.mvp_pk && md->spawn->state.boss)
+	if(md->spawn->state.boss)
 	 {
 		char message[128];
 		sprintf (message, "Han derrotado al MvP %s PvP queda desactivado",md->name);
 		clif_broadcast(&md->bl, message, strlen(message) + 1, BC_DEFAULT, ALL_SAMEMAP);
  		map_setmapflag(md->bl.m, MF_PVP, false);
-	} else
- 		map_setmapflag(md->bl.m, MF_PVP, false);
-
+	}
 
 	if( !rebirth )
 		mob_setdelayspawn(md); //Set respawning.

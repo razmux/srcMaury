@@ -1154,6 +1154,7 @@ void initChangeTables(void)
 	StatusIconChangeTable[SC_GEFFEN_MAGIC2] = EFST_GEFFEN_MAGIC2;
 	StatusIconChangeTable[SC_GEFFEN_MAGIC3] = EFST_GEFFEN_MAGIC3;
 
+
 	// RODEX
 	StatusIconChangeTable[SC_DAILYSENDMAILCNT] = EFST_DAILYSENDMAILCNT;
 
@@ -8687,8 +8688,8 @@ int status_change_start(struct block_list* src, struct block_list* bl,enum sc_ty
 	case SC_DECREASEAGI:
 	case SC_QUAGMIRE:
 	case SC_DONTFORGETME:
-		//if(sc->data[SC_SPEEDUP1]) // elimina los debuff
-			//return 0;
+		//if(sc->data[SC_SPEEDUP1])
+		//	return 0;
 		break;
 	case SC_ANGRIFFS_MODUS:
 	case SC_GOLDENE_FERSE:
@@ -9969,6 +9970,7 @@ int status_change_start(struct block_list* src, struct block_list* bl,enum sc_ty
 			break;
 
 		case SC_AUTOGUARD:
+			if( !(flag&SCSTART_NOAVOID) ) {
 				struct map_session_data *tsd;
 				int i;
 				for( i = val2 = 0; i < val1; i++) {
@@ -9976,8 +9978,7 @@ int status_change_start(struct block_list* src, struct block_list* bl,enum sc_ty
 					val2 += (t < 0)? 1:t;
 				}
 
-			if( bl->type&(BL_PC|BL_MER) ) {
-				if( !(flag&SCSTART_NOAVOID) ) {
+				if( bl->type&(BL_PC|BL_MER) ) {
 					if( sd ) {
 						for( i = 0; i < MAX_DEVOTION; i++ ) {
 							if( sd->devotion[i] && (tsd = map_id2sd(sd->devotion[i])) )
@@ -9991,10 +9992,11 @@ int status_change_start(struct block_list* src, struct block_list* bl,enum sc_ty
 			break;
 
 		case SC_DEFENDER:
+			if (!(flag&SCSTART_NOAVOID)) {
 				val2 = 5 + 15*val1; // Damage reduction
 				val3 = 0; // Unused, previously speed adjustment
 				val4 = 250 - 50*val1; // Aspd adjustment
-			if (!(flag&SCSTART_NOAVOID)) {
+
 				if (sd) {
 					struct map_session_data *tsd;
 					int i;
@@ -12014,9 +12016,9 @@ int status_change_clear(struct block_list* bl, int type)
 			case SC_JEXPBOOST:
 			case SC_AUTOTRADE:
 			case SC_AUTOREFRESH: // eAmod
-/* 		Debuff de cantos
 			case SC_WHISTLE:
 			case SC_ASSNCROS:
+/*			Debuff de cantos
 			case SC_POEMBRAGI:
 			case SC_APPLEIDUN:
 			case SC_HUMMING:

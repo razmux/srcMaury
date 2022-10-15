@@ -403,16 +403,6 @@ int bg_team_join(int bg_id, struct map_session_data *sd)
 		bgd->leader_char_id = sd->status.char_id;
 		sd->bmaster_flag = bgd;
 	}
-
-	if( battle_config.bg_ranked_mode && sd->status.bgstats.rank_games < battle_config.bg_ranked_max_games && DIFF_TICK(last_tick,bgd->creation_tick) < 60 )
-	{
-		char output[128];
-		bgd->members[i].ranked = true;
-		sd->status.bgstats.rank_games++;
-		sprintf(output,"-- RANKED BATTLEGROUND MATCH %d OF %d --", sd->status.bgstats.rank_games, battle_config.bg_ranked_max_games);
-		clif_displaymessage(sd->fd,output);
-	}
-
 	
 	guild_send_dot_remove(sd);
 
@@ -814,6 +804,36 @@ void bg_guild_build_data(void)
 	bg_guild[2].ccolor = battle_config.bg_team_ccolor_green;
 }
 
+void bg_team_getitem(int bg_id, int nameid, int amount)
+{
+	struct battleground_data *bg;
+	struct map_session_data *sd;
+	struct item_data *id;
+	struct item it;
+	int get_amount, j, flag;
+
+	if (amount < 1 || (bg = bg_team_search(bg_id)) == NULL || (id = itemdb_exists(nameid)) == NULL)
+		return;
+	//if (nameid != 7828 && nameid != 7829 && nameid != 7773) // Why limit it in only Badges? Puto el que lo lea [Easycore]
+	//	return;
+	if( battle_config.bg_reward_rates != 100 )
+		amount = amount * battle_config.bg_reward_rates / 100;
+
+	memset(&it, 0, sizeof(it));
+	it.nameid = nameid;
+	it.identify = 1;
+
+	for (j = 0; j < MAX_BG_MEMBERS; j++)
+	{
+		if ((sd = bg->members[j].sd) == NULL)
+			continue;
+		
+		get_amount = amount;
+
+		if ((flag = pc_additem(sd, &it, get_amount, LOG_TYPE_SCRIPT)))
+			clif_additem(sd, 0, 0, flag);
+	}
+}
 void bg_team_get_kafrapoints(int bg_id, int amount)
 {
 	struct battleground_data *bgd;
@@ -840,7 +860,7 @@ void bg_team_getitem(int bg_id, int winlost)
 	struct battleground_data *bgd;
 	struct map_session_data *sd;
 	struct item it;
-	int amount, battle_amount, i, j, flag, value, rank = 0;
+	int amount, battle_amount, i, j, flag, value;
 	int nameid[3] = {7829, 7828, 7773};
 	
 	if((bgd = bg_team_search(bg_id)) == NULL)
@@ -866,7 +886,7 @@ void bg_team_getitem(int bg_id, int winlost)
 	
 	if (amount < 1 || battle_amount < 1)
 	{
-		ShowError("[Mavis]: bg_team_getitem, Negative or 0 value");
+		ShowError("[Oboro]: bg_team_getitem, Negative or 0 value");
 		return;
 	}
 	
@@ -874,14 +894,6 @@ void bg_team_getitem(int bg_id, int winlost)
 	{
 		if( (sd = bgd->members[j].sd) == NULL )
 			continue;
-
-		if( battle_config.bg_ranking_bonus )
-		{
-				rank = 0;
-				ARR_FIND(0,MAX_FAME_LIST,i,bg_fame_list[i].id == sd->status.char_id);
-				if( i < MAX_FAME_LIST )
-					rank = 1;
-			}
 	
 		for (i = 0; i < 3; i++)
 		{

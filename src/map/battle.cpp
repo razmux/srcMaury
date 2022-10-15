@@ -359,15 +359,8 @@ int battle_delay_damage(t_tick tick, int amotion, struct block_list *src, struct
 	}
 
 	if( ((d_tbl && check_distance_bl(target, d_tbl, sc->data[SC_DEVOTION]->val3)) || e_tbl) &&
-		damage > 0 && skill_id != PA_PRESSURE && skill_id != CR_REFLECTSHIELD ){
-		struct map_session_data* tsd = BL_CAST( BL_PC, target );
-
-		if( tsd && pc_issit( tsd ) && battle_config.devotion_standup_fix ){
-			pc_setstand( tsd, true );
-			skill_sit( tsd, 0 );
-		}
+		damage > 0 && skill_id != PA_PRESSURE && skill_id != CR_REFLECTSHIELD )
 		damage = 0;
-	}
 
 	if ( !battle_config.delay_battle_damage || amotion <= 1 ) {
 		//Deal damage
@@ -1040,11 +1033,7 @@ bool battle_check_sc(struct block_list *src, struct block_list *target, struct s
 		status_change_end(target, SC_SAFETYWALL, INVALID_TIMER);
 	}
 
-	if (sc->data[SC_NEUTRALBARRIER] && ((d->flag&(BF_LONG|BF_MAGIC)) == BF_LONG
-#ifndef RENEWAL
-		|| skill_id == CR_ACIDDEMONSTRATION
-#endif
-		)) {
+	if (sc->data[SC_NEUTRALBARRIER] && ((d->flag&(BF_LONG|BF_MAGIC)) == BF_LONG || skill_id == CR_ACIDDEMONSTRATION)) {
 		d->dmg_lv = ATK_MISS;
 		return false;
 	}
@@ -1347,7 +1336,13 @@ int64 battle_calc_damage(struct block_list *src,struct block_list *bl,struct Dam
 		}
 #endif
 
-		if (sc->data[SC_DEFENDER] && skill_id != NJ_ZENYNAGE && skill_id != KO_MUCHANAGE && (flag&(BF_LONG|BF_WEAPON)) == (BF_LONG|BF_WEAPON) || skill_id == CR_ACIDDEMONSTRATION || skill_id == GN_FIRE_EXPANSION_ACID)
+		if (sc->data[SC_DEFENDER] &&
+			skill_id != NJ_ZENYNAGE && skill_id != KO_MUCHANAGE &&
+#ifdef RENEWAL
+			((flag&(BF_LONG|BF_WEAPON)) == (BF_LONG|BF_WEAPON) || skill_id == CR_ACIDDEMONSTRATION || skill_id == GN_FIRE_EXPANSION_ACID))
+#else
+			(flag&(BF_LONG|BF_WEAPON)) == (BF_LONG|BF_WEAPON))
+#endif
 			damage -= damage * sc->data[SC_DEFENDER]->val2 / 100;
 
 		if(sc->data[SC_ADJUSTMENT] && (flag&(BF_LONG|BF_WEAPON)) == (BF_LONG|BF_WEAPON))
@@ -6611,6 +6606,7 @@ struct Damage battle_calc_misc_attack(struct block_list *src,struct block_list *
 					md.damage = 0;
 			}
 			break;
+		case CR_ACIDDEMONSTRATION:
 		case GN_FIRE_EXPANSION_ACID:
 #ifdef RENEWAL
 			// Official Renewal formula [helvetica]
@@ -6625,10 +6621,7 @@ struct Damage battle_calc_misc_attack(struct block_list *src,struct block_list *
 				// AD benefits from endow/element but damage is forced back to neutral
 				md.damage = battle_attr_fix(src, target, md.damage, ELE_NEUTRAL, tstatus->def_ele, tstatus->ele_lv);
 			}
-			// Fall through
-
 #else
-		case CR_ACIDDEMONSTRATION:
 			if(tstatus->vit+sstatus->int_) //crash fix
 				md.damage = (int)((int64)7*tstatus->vit*sstatus->int_*sstatus->int_ / (10*(tstatus->vit+sstatus->int_)));
 			else
@@ -7443,19 +7436,8 @@ enum damage_lv battle_weapon_attack(struct block_list* src, struct block_list* t
 				(d_bl->type == BL_PC && ((TBL_PC*)d_bl)->devotion[sce->val2] == target->id)
 				) && check_distance_bl(target, d_bl, sce->val3) )
 			{
-				// Only trigger if the devoted player was hit
-				if( damage > 0 ){
-					struct map_session_data* dsd = BL_CAST( BL_PC, d_bl );
-
-					// The devoting player needs to stand up
-					if( dsd && pc_issit( dsd ) ){
-						pc_setstand( dsd, true );
-						skill_sit( dsd, 0 );
-					}
-
-					clif_damage(d_bl, d_bl, gettick(), wd.amotion, wd.dmotion, damage, 1, DMG_NORMAL, 0, false);
-					status_fix_damage(NULL, d_bl, damage, 0, 0);
-				}
+				clif_damage(d_bl, d_bl, gettick(), 0, 0, damage, 0, DMG_NORMAL, 0, false);
+				status_fix_damage(NULL, d_bl, damage, 0, CR_DEVOTION);
 			}
 			else
 				status_change_end(target, SC_DEVOTION, INVALID_TIMER);
@@ -8280,13 +8262,13 @@ static const struct _battle_data {
 	{ "max_aspd",                           &battle_config.max_aspd,                        190,    100,    199,            },
 	{ "max_third_aspd",                     &battle_config.max_third_aspd,                  193,    100,    199,            },
 	{ "max_walk_speed",                     &battle_config.max_walk_speed,                  300,    100,    100*DEFAULT_WALK_SPEED, },
-	{ "max_lv",                             &battle_config.max_lv,                          99,     0,      MAX_LEVEL,      },
-	{ "aura_lv",                            &battle_config.aura_lv,                         99,     0,      INT_MAX,        },
+	{ "max_lv",                             &battle_config.max_lv,                          150,     0,      MAX_LEVEL,      },
+	{ "aura_lv",                            &battle_config.aura_lv,                         150,     0,      INT_MAX,        },
 	{ "max_hp_lv99",                        &battle_config.max_hp_lv99,                    330000,  100,    1000000000,     },
 	{ "max_hp_lv150",                       &battle_config.max_hp_lv150,                   660000,  100,    1000000000,     },
 	{ "max_hp",                             &battle_config.max_hp,                        1100000,  100,    1000000000,     },
 	{ "max_sp",                             &battle_config.max_sp,                          32500,  100,    1000000000,     },
-	{ "max_cart_weight",                    &battle_config.max_cart_weight,                 8000,   100,    1000000,        },
+	{ "max_cart_weight",                    &battle_config.max_cart_weight,                 10000,   100,    1000000,        },
 	{ "max_parameter",                      &battle_config.max_parameter,                   99,     10,     SHRT_MAX,       },
 	{ "max_baby_parameter",                 &battle_config.max_baby_parameter,              80,     10,     SHRT_MAX,       },
 	{ "max_def",                            &battle_config.max_def,                         99,     0,      INT_MAX,        },
@@ -8685,8 +8667,7 @@ static const struct _battle_data {
 	{ "bg_order_behavior",                  &battle_config.bg_order_behavior,               1,      0,      1,              },
 	{ "bg_reserved_char_id",                &battle_config.bg_reserved_char_id,             999996, 0,      INT_MAX,        },
 	{ "woe_reserved_char_id",		&battle_config.woe_reserved_char_id,            999997, 0,      INT_MAX,        },
-	{ "universal_reserved_char_id",		&battle_config.universal_reserved_char_id,            999998, 0,      INT_MAX,        },
-	{ "reserved_can_trade",			&battle_config.reserved_can_trade,    		0,      0,      1,              },
+	{ "bg_can_trade",			&battle_config.bg_can_trade,    		1,      0,      1,              },
 	{ "bg_double_login",			&battle_config.bg_double_login,                 1,      0,      1,              },
 	{ "bg_team_color",			&battle_config.bg_team_color,                   1,      0,      1,              },
 	{ "bg_party_skills",			&battle_config.bg_party_skills,                 1,      0,      1,              },
@@ -8697,15 +8678,11 @@ static const struct _battle_data {
 	{ "bg_extended_check_equip",		&battle_config.bg_extended_check_equip,         1,      0,      1,              },
 	{ "bg_queue_interface",			&battle_config.bg_queue_interface,              1,      0,      1,              },
 	{ "bg_invincible_time",                 &battle_config.bg_invincible_time,              5000,   0,      INT_MAX,        },
-	{ "bg_badges",                   	&battle_config.bg_badges,           		0,      0,      INT_MAX,        }, //[Oboro]
+	{ "bg_badges",                   		&battle_config.bg_badges,           	0,      0,      INT_MAX,        }, //[Oboro]
 	{ "bg_battle_badges",                  	&battle_config.bg_battle_badges,      		0,      0,      INT_MAX,        }, //[Oboro]
 	{ "bg_kafrapoints",                 	&battle_config.bg_kafrapoints,      		0,      0,      INT_MAX,        }, //[Oboro]
 	{ "bg_event_extra_badges", 	        &battle_config.bg_event_extra_badges,      	0,      0,      INT_MAX,        }, //[Oboro]
 	{ "bg_win_badges", 	     		&battle_config.bg_win_badges,      		0,      0,      INT_MAX,        }, //[Oboro]
-	{ "bg_ranking_bonus",                   &battle_config.bg_ranking_bonus,                0,      0,      100,            },
-	{ "bg_ranked_mode",                     &battle_config.bg_ranked_mode,                  0,      0,      1,              },
-	{ "bg_ranked_max_games",                &battle_config.bg_ranked_max_games,             50,     10,     100,            },
-	{ "bg_items_on_pvp",                    &battle_config.bg_items_on_pvp,                 1,      0,      1,              },
 	// Premium Account System
 	{ "premium_group_id",                   &battle_config.premium_group_id,                0,      0,      INT_MAX,        },
 	{ "premium_bonusexp",                   &battle_config.premium_bonusexp,                0,      0,      INT_MAX,        },
@@ -8714,8 +8691,6 @@ static const struct _battle_data {
 	{ "premium_dropboost",                  &battle_config.premium_dropboost,               0,      0,      INT_MAX,        },
 	{ "premium_gemstone",                   &battle_config.premium_gemstone,                2,      0,      2,              },
 	{ "premium_gm",                   	&battle_config.premium_gm,                      10,     0,      99,             },
-	{ "premium_announce_delay",     	&battle_config.premium_announce_delay,          1,      0,      INT_MAX,        },
-
 	// Extended Vending system [Lilith]
 	{ "extended_vending",			&battle_config.extended_vending,	1,		0,		1,		},
 	{ "show_broadcas_info",			&battle_config.show_broadcas_info,	1,		0,		1,		},
@@ -8727,9 +8702,8 @@ static const struct _battle_data {
 	{ "unmount_on_damage",                  &battle_config.unmount_on_damage,               0,      0,      1,       	},
 	{ "mount_delay", 	             	&battle_config.mount_delay, 	         	0,      0,      60000,        	},
 	//eAmod Codes
-	{ "costume_reserved_char_id",           &battle_config.costume_reserved_char_id,        999999, 0,      INT_MAX,        },
+	{ "costume_reserved_char_id",           &battle_config.costume_reserved_char_id,        999998, 0,      INT_MAX,        },
 	{ "mob_slave_adddrop",                  &battle_config.mob_slave_adddrop,               0,      0,      1,              },
-	{ "mvp_pk",                  		&battle_config.mvp_pk,              		0,      0,      1,              },
 	{ "reflect_damage_fix",                 &battle_config.reflect_damage_fix,              1|2,    0,      1|2,            },
 	{ "guild_wars",                         &battle_config.guild_wars,                      0,      0,      1,              },
 	//PvPMode
@@ -8743,18 +8717,13 @@ static const struct _battle_data {
 	{ "aura_pvpmode_enable",                &battle_config.aura_pvpmode_enable,             0,      0,      INT_MAX,        },
 	{ "aura_pvpmode_top10",                 &battle_config.aura_pvpmode_top10,              0,      0,      INT_MAX,        },
 	{ "aura_top10_bg",                	&battle_config.aura_top10_bg,             	0,      0,      INT_MAX,        },
-	{ "feature.autovend",                   &battle_config.feature_autovend,                1,      0,      1,		},
-	{ "feature.open_autovend_same_account", &battle_config.open_autovend_same_account,      1,      0,      1,		},
-	{ "feature.all_vending_to_autovend",	&battle_config.all_vending_to_autovend,		1,      0,      1,		},
-	{ "disp_servervip_msg",			&battle_config.disp_servervip_msg,		0,	0,	1,		},
-	{ "devotion_standup_fix",               &battle_config.devotion_standup_fix,            1,      0,      1,              },
 	{ "land_protector_behavior",            &battle_config.land_protector_behavior,         0,      0,      1,              },
 	{ "no_siege_on_bg",			&battle_config.no_siege_on_bg,			0,	0,	1,		},
 	{ "no_gvg_on_bg",			&battle_config.no_gvg_on_bg,			0,	0,	1,		},
 	{ "force_send_bgemblem",		&battle_config.force_send_bgemblem,		0,	0,	1,		},
 	{ "no_noks_boss",                	&battle_config.no_noks_boss,          		0,      0,      1,        	},
-	{ "min_guild",                        	&battle_config.min_guild,                     	4,       0,      INT_MAX,        },
-	{ "max_guild",                        	&battle_config.max_guild,			30,      0,      INT_MAX,        },
+	{ "randomoption_script",                &battle_config.randomoption_script,             0,      0,      1,              },
+
 
 #include "../custom/battle_config_init.inc"
 };

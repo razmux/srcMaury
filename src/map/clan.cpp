@@ -128,7 +128,6 @@ void clan_member_joined( struct map_session_data* sd ){
 
 		intif_clan_member_joined(clan->id);
 		clif_clan_onlinecount(clan);
-
 	}
 }
 

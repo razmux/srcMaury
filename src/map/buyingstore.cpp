@@ -409,10 +409,10 @@ void buyingstore_trade(struct map_session_data* sd, uint32 account_id, unsigned 
 			clif_buyingstore_trade_failed_seller(sd, BUYINGSTORE_TRADE_SELLER_FAILED, nameid);
 			return;
 		}
-		if( sd->inventory.u.items_inventory[index].card[0] == CARD0_CREATE && (char_id = MakeDWord(sd->inventory.u.items_inventory[index].card[2],sd->inventory.u.items_inventory[index].card[3])) > 0 && (char_id == battle_config.bg_reserved_char_id || char_id == battle_config.woe_reserved_char_id || char_id == battle_config.universal_reserved_char_id) && battle_config.reserved_can_trade )
+		if( sd->inventory.u.items_inventory[index].card[0] == CARD0_CREATE && (char_id = MakeDWord(sd->inventory.u.items_inventory[index].card[2],sd->inventory.u.items_inventory[index].card[3])) > 0 && (char_id == battle_config.bg_reserved_char_id || char_id == battle_config.woe_reserved_char_id) && !battle_config.bg_can_trade )
 		{ // Items where creator's ID is important
 			clif_buyingstore_trade_failed_seller(sd, BUYINGSTORE_TRADE_SELLER_FAILED, nameid);
-			clif_displaymessage(sd->fd, "No se pueden intercambiar artículos reservados (Battleground, WoE, Universal).");
+			clif_displaymessage(sd->fd, "Cannot Trade event reserved Items (Battleground, WoE).");
 			return;
 		}
 		ARR_FIND( 0, pl_sd->buyingstore.slots, listidx, pl_sd->buyingstore.items[listidx].nameid == nameid );
@@ -669,9 +669,9 @@ void buyingstore_reopen( struct map_session_data* sd ){
 void do_init_buyingstore_autotrade( void ) {
 	if(battle_config.feature_autotrade) {
 		if (Sql_Query(mmysql_handle,
-			"SELECT `id`, `account_id`, `char_id`, `sex`, `title`, `limit`, `body_direction`, `head_direction`, `sit`, `autotrade` "
+			"SELECT `id`, `account_id`, `char_id`, `sex`, `title`, `limit`, `body_direction`, `head_direction`, `sit` "
 			"FROM `%s` "
-			"WHERE (`autotrade` = 1 OR `autotrade` = 2) AND `limit` > 0 AND (SELECT COUNT(`buyingstore_id`) FROM `%s` WHERE `buyingstore_id` = `id`) > 0 "
+			"WHERE `autotrade` = 1 AND `limit` > 0 AND (SELECT COUNT(`buyingstore_id`) FROM `%s` WHERE `buyingstore_id` = `id`) > 0 "
 			"ORDER BY `id`;",
 			buyingstores_table, buyingstore_items_table ) != SQL_SUCCESS )
 		{
@@ -700,7 +700,6 @@ void do_init_buyingstore_autotrade( void ) {
 				Sql_GetData(mmysql_handle, 6, &data, NULL); at->dir = atoi(data);
 				Sql_GetData(mmysql_handle, 7, &data, NULL); at->head_dir = atoi(data);
 				Sql_GetData(mmysql_handle, 8, &data, NULL); at->sit = atoi(data);
-				Sql_GetData(mmysql_handle, 9, &data, NULL); at->autotrade = atoi(data);
 				at->count = 0;
 
 				if (battle_config.feature_autotrade_direction >= 0)

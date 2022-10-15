@@ -66,7 +66,7 @@ int chrif_changemapserver(struct map_session_data* sd, uint32 ip, uint16 port);
 int chrif_searchcharid(uint32 char_id);
 int chrif_changeemail(int id, const char *actual_email, const char *new_email);
 int chrif_req_login_operation(int aid, const char* character_name, enum chrif_req_op operation_type, int32 timediff, int val1, int val2);
-int chrif_updatefamelist(struct map_session_data *sd, short flag);
+int chrif_updatefamelist(struct map_session_data *sd, int flag);
 int chrif_buildfamelist(void);
 int chrif_save_scdata(struct map_session_data *sd);
 int chrif_char_offline(struct map_session_data *sd);
@@ -76,7 +76,6 @@ int send_users_tochar(void);
 int chrif_char_online(struct map_session_data *sd);
 int chrif_changesex(struct map_session_data *sd, bool change_account);
 int chrif_divorce(int partner_id1, int partner_id2);
-int chrif_char2dumpfile(int char_id); // Zephyrus
 
 int chrif_removefriend(uint32 char_id, int friend_id);
 
@@ -92,5 +91,13 @@ void do_final_chrif(void);
 void do_init_chrif(void);
 
 int chrif_flush_fifo(void);
+
+// (^~_~^) Gepard Shield Start
+int chrif_gepard_req_block(unsigned int unique_id, const char* violator_name, unsigned int violator_aid, const char* initiator_name, unsigned int initiator_aid, const char* unban_time_str, const char* reason_str);
+bool chrif_gepard_ack_block(int fd);
+int chrif_gepard_req_unblock(unsigned int unique_id, const char* violator_name, unsigned int violator_aid, unsigned int initiator_aid);
+bool chrif_gepard_ack_unblock(int fd);
+int chrif_gepard_save_report(struct map_session_data* sd, const char* report_str);
+// (^~_~^) Gepard Shield End
 
 #endif /* CHRIF_HPP */

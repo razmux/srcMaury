@@ -324,9 +324,6 @@ struct map_session_data {
 		unsigned int pvpmode : 1; // PK Mode [Zephyrus]
 		unsigned int battleinfo : 1;
 		unsigned int restock;
-		unsigned short afk : 1; //@afk auto message. [DarbladErxX]
-		char afk_msg[CHAT_SIZE_MAX]; //@afk auto message. [DarbladErxX]
-		unsigned short hideview; // @nohats
 	} state;
 	struct {
 		unsigned char no_weapon_damage, no_magic_damage, no_misc_damage;
@@ -816,13 +813,6 @@ struct map_session_data {
 	uint32* hatEffectIDs;
 	uint8 hatEffectCount;
 #endif
-
-	// Autovend
-	struct {
-		uint32 account_id;
-		bool active;
-	} autovend;
-
 };
 
 extern struct eri *pc_sc_display_ers; /// Player's SC display table
@@ -1149,8 +1139,6 @@ char pc_payzeny(struct map_session_data *sd, int zeny, enum e_log_pick_type type
 enum e_additem_result pc_additem(struct map_session_data *sd, struct item *item, int amount, e_log_pick_type log_type, bool autostoring = false);
 char pc_getzeny(struct map_session_data *sd, int zeny, enum e_log_pick_type type, struct map_session_data *tsd);
 char pc_delitem(struct map_session_data *sd, int n, int amount, int type, short reason, e_log_pick_type log_type);
-
-int INIT_EVENT_RESTOCK( struct map_session_data *sd, int item_id, int amount );
 
 uint64 pc_generate_unique_id(struct map_session_data *sd);
 

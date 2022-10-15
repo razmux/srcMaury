@@ -47,7 +47,7 @@ static const int packet_len_table[0x50] = { // U - used, F - free
 	 2,10, 2,-1,-1,-1, 2, 7,	// 2b18-2b1f: U->2b18, U->2b19, U->2b1a, U->2b1b, U->2b1c, U->2b1d, U->2b1e, U->2b1f
 	-1,10, 8, 2, 2,14,19,19,	// 2b20-2b27: U->2b20, U->2b21, U->2b22, U->2b23, U->2b24, U->2b25, U->2b26, U->2b27
 	-1, 0, 6,15, 0, 6,-1,-1,	// 2b28-2b2f: U->2b28, F->2b29, U->2b2a, U->2b2b, F->2b2c, U->2b2d, U->2b2e, U->2b2f
-	 4, 4, 4, 4,-1, 6, 0, 0,	// 2b30-2b37: U->2b30, U->2b31, U->2b32, U->2b33, U->2b34, F->2b35, F->2b36, F->2b37
+	 4, 4, 4, 4,-1, 6, 0, 0,    // 2b30-2b37: U->2b30, U->2b31, U->2b32, U->2b33, U->2b34, F->2b35, F->2b36, F->2b37
  };
 
 //Used Packets:
@@ -106,9 +106,6 @@ static const int packet_len_table[0x50] = { // U - used, F - free
 //2b2d: Outgoing, chrif_bsdata_request -> request bonus_script for pc_authok'ed char.
 //2b2e: Outgoing, chrif_bsdata_save -> Send bonus_script of player for saving.
 //2b2f: Incoming, chrif_bsdata_received -> received bonus_script of player for loading.
-// eAmod Packets --- >
-//2b34: Incoming, chrif_recvfamelist_single -> '...'
-//2b35: Outgoing, chrif_char2dumpfile -> '...'
 
 int chrif_connected = 0;
 int char_fd = -1;
@@ -1211,26 +1208,21 @@ int chrif_disconnectplayer(int fd) {
 /*==========================================
  * Request/Receive top 10 Fame character list
  *------------------------------------------*/
-int chrif_updatefamelist(struct map_session_data* sd, short flag) {
+int chrif_updatefamelist(struct map_session_data* sd, int flag) {
 	char type;
 
 	chrif_check(-1);
 
 	if (!flag)
-		switch(sd->class_ & MAPID_UPPERMASK)
-		{
+	switch(sd->class_ & MAPID_UPPERMASK) {
 		case MAPID_BLACKSMITH: type = RANK_BLACKSMITH; break;
 		case MAPID_ALCHEMIST:  type = RANK_ALCHEMIST; break;
 		case MAPID_TAEKWON:    type = RANK_TAEKWON; break;
 		default:
 			return 0;
-		}
-	
-	switch(flag){
-	case 1: type = RANK_PVP; break;
-	case 2: type = RANK_BG; break;
-	case 3: type = RANK_WOE; break;	 
 	}
+
+	else type = 3 + flag; // 4 = PK | 5 = BG Rank | 6 = Woe Ranked
 
 	WFIFOHEAD(char_fd, 11);
 	WFIFOW(char_fd,0) = 0x2b10;
@@ -1261,61 +1253,18 @@ int chrif_buildfamelist(void) {
 	return 0;
 }
 
-int chrif_recvfamelist_single(int fd, int type)
-{
-	struct fame_list* list;
-	int i, len = 6, size;
-
-	switch( type )
-	{
-		MAPID_BLACKSMITH: memset(smith_fame_list, 0, sizeof(smith_fame_list)); list = smith_fame_list;   break;
-		case MAPID_ALCHEMIST: memset(chemist_fame_list, 0, sizeof(chemist_fame_list)); list = chemist_fame_list; break;
-		case MAPID_TAEKWON: memset(taekwon_fame_list, 0, sizeof(taekwon_fame_list)); list = taekwon_fame_list; break;
-		case RANK_PVP: memset(pvprank_fame_list, 0, sizeof(pvprank_fame_list)); list = pvprank_fame_list; break;
-		case RANK_BG: memset(bg_fame_list, 0, sizeof(bg_fame_list)); list = bg_fame_list;  break;
-		case RANK_WOE: memset(woe_fame_list, 0, sizeof(woe_fame_list)); list = woe_fame_list;  break;
-		default: return 0;
-	}
-
-	size = RFIFOW(fd,2);
-	for( i = 0; len < size && i < MAX_FAME_LIST; i++ )
-	{
-		memcpy(&list[i],RFIFOP(fd,len),sizeof(struct fame_list));
-		len += sizeof(struct fame_list);
-	}
-
-	return 0;
-}
-
 int chrif_recvfamelist(int fd) {
 	int num, size;
 	int total = 0, len = 14;
 
-	memset(smith_fame_list, 0, sizeof(smith_fame_list));
-	memset(chemist_fame_list, 0, sizeof(chemist_fame_list));
-	memset(taekwon_fame_list, 0, sizeof(taekwon_fame_list));
+	memset (smith_fame_list, 0, sizeof(smith_fame_list));
+	memset (chemist_fame_list, 0, sizeof(chemist_fame_list));
+	memset (taekwon_fame_list, 0, sizeof(taekwon_fame_list));
 	memset(pvprank_fame_list, 0, sizeof(pvprank_fame_list));
-	memset(bg_fame_list, 0, sizeof(bg_fame_list));
-	memset(woe_fame_list, 0, sizeof(woe_fame_list));
+	memset (bg_fame_list, 0, sizeof(bg_fame_list));
+	memset (woe_fame_list, 0, sizeof(woe_fame_list));
 
-	size = RFIFOW(fd,12); //WOERank block size
-	for( num = 0; len < size && num < MAX_FAME_LIST; num++ )
-	{
-		memcpy(&woe_fame_list[num],RFIFOP(fd,len),sizeof(struct fame_list));
-		len += sizeof(struct fame_list);
-	}
-	total += num;
-
-
-	size = RFIFOW(fd,10); //BGRank block size
-	for( num = 0; len < size && num < MAX_FAME_LIST; num++ )
-	{
-		memcpy(&bg_fame_list[num],RFIFOP(fd,len),sizeof(struct fame_list));
-		len += sizeof(struct fame_list);
-	}
-	total += num;
-
-	size = RFIFOW(fd,8); //PvPRank block size
+	size = RFIFOW(fd,12); //PvPRank block size
 	for( num = 0; len < size && num < MAX_FAME_LIST; num++ )
 	{
 		memcpy(&pvprank_fame_list[num],RFIFOP(fd,len),sizeof(struct fame_list));
@@ -1323,28 +1272,46 @@ int chrif_recvfamelist(int fd) {
 	}
 	total += num;
 
-	size = RFIFOW(fd,6); //Blacksmith block size
+	size = RFIFOW(fd,10); //WoE rank block size
 	for( num = 0; len < size && num < MAX_FAME_LIST; num++ )
 	{
-		memcpy(&smith_fame_list[num],RFIFOP(fd,len),sizeof(struct fame_list));
+		memcpy(&woe_fame_list[num],RFIFOP(fd,len),sizeof(struct fame_list));
+		len += sizeof(struct fame_list);
+	}
+
+	total += num;
+
+	size = RFIFOW(fd,8); //BG rank block size
+	for( num = 0; len < size && num < MAX_FAME_LIST; num++ )
+	{
+		memcpy(&bg_fame_list[num],RFIFOP(fd,len),sizeof(struct fame_list));
+		len += sizeof(struct fame_list);
+	}
+
+	total += num;
+
+	size = RFIFOW(fd, 6); //Blacksmith block size
+
+	for (num = 0; len < size && num < MAX_FAME_LIST; num++) {
+		memcpy(&smith_fame_list[num], RFIFOP(fd,len), sizeof(struct fame_list));
  		len += sizeof(struct fame_list);
 	}
 
 	total += num;
 
-	size = RFIFOW(fd,4); //Alchemist block size
-	for( num = 0; len < size && num < MAX_FAME_LIST; num++ )
-	{
-		memcpy(&chemist_fame_list[num],RFIFOP(fd,len),sizeof(struct fame_list));
+	size = RFIFOW(fd, 4); //Alchemist block size
+
+	for (num = 0; len < size && num < MAX_FAME_LIST; num++) {
+		memcpy(&chemist_fame_list[num], RFIFOP(fd,len), sizeof(struct fame_list));
  		len += sizeof(struct fame_list);
 	}
 
 	total += num;
 
-	size = RFIFOW(fd,2); //Total packet length
-	for( num = 0; len < size && num < MAX_FAME_LIST; num++ )
-	{
-		memcpy(&taekwon_fame_list[num],RFIFOP(fd,len),sizeof(struct fame_list));
+	size = RFIFOW(fd, 2); //Total packet length
+
+	for (num = 0; len < size && num < MAX_FAME_LIST; num++) {
+		memcpy(&taekwon_fame_list[num], RFIFOP(fd,len), sizeof(struct fame_list));
  		len += sizeof(struct fame_list);
 	}
 
@@ -1362,13 +1329,13 @@ int chrif_updatefamelist_ack(int fd) {
 	uint8 index;
 
 	switch (RFIFOB(fd,2)) {
-	case RANK_BLACKSMITH:	list = smith_fame_list;   break;
-	case RANK_ALCHEMIST:	list = chemist_fame_list; break;
-	case RANK_TAEKWON:	list = taekwon_fame_list; break;
-	case RANK_PVP: 		list = pvprank_fame_list; break;
-	case RANK_BG: 		list = bg_fame_list;  break;
-	case RANK_WOE: 		list = woe_fame_list;  break;
-	default: return 0;
+		case RANK_BLACKSMITH:	list = smith_fame_list;   break;
+		case RANK_ALCHEMIST:	list = chemist_fame_list; break;
+		case RANK_TAEKWON:		list = taekwon_fame_list; break;
+		case RANK_PVP: list = pvprank_fame_list; break;
+		case RANK_BG:			list = bg_fame_list;      break;
+		case RANK_WOE:			list = woe_fame_list;      break;
+		default: return 0;
 	}
 
 	index = RFIFOB(fd, 3);
@@ -1575,21 +1542,6 @@ int chrif_char_reset_offline(void) {
 	WFIFOHEAD(char_fd,2);
 	WFIFOW(char_fd,0) = 0x2b18;
 	WFIFOSET(char_fd,2);
-
-	return 0;
-}
-
-/*=========================================
- * Request to create a Backup file of a char_id
- *-----------------------------------------*/
-int chrif_char2dumpfile(int char_id)
-{
-	chrif_check(-1);
-
-	WFIFOHEAD(char_fd,6);
-	WFIFOW(char_fd,0) = 0x2b35;
-	WFIFOL(char_fd,2) = char_id;
-	WFIFOSET(char_fd,6);
 
 	return 0;
 }
@@ -1862,6 +1814,24 @@ int chrif_parse(int fd) {
 
 	while ( RFIFOREST(fd) >= 2 ) {
 		int cmd = RFIFOW(fd,0);
+
+// (^~_~^) Gepard Shield Start
+		if (cmd == GEPARD_C2M_BLOCK_ACK)
+		{
+			if (chrif_gepard_ack_block(fd) == true)
+				continue;
+			else
+				return 0;
+		}
+		else if (cmd == GEPARD_C2M_UNBLOCK_ACK)
+		{
+			if (chrif_gepard_ack_unblock(fd) == true)
+				continue;
+			else
+				return 0;
+		}
+// (^~_~^) Gepard Shield End
+
 		if (cmd < 0x2af8 || cmd >= 0x2af8 + ARRAYLENGTH(packet_len_table) || packet_len_table[cmd-0x2af8] == 0) {
 			int r = intif_parse(fd); // Passed on to the intif
 
@@ -1910,7 +1880,6 @@ int chrif_parse(int fd) {
 			case 0x2b27: chrif_authfail(fd); break;
 			case 0x2b2b: chrif_parse_ack_vipActive(fd); break;
 			case 0x2b2f: chrif_bsdata_received(fd); break;
-			case 0x2b34: chrif_recvfamelist_single(fd,RFIFOW(fd,4)); break;
 			default:
 				ShowError("chrif_parse : unknown packet (session #%d): 0x%x. Disconnecting.\n", fd, cmd);
 				set_eof(fd);
@@ -2088,3 +2057,189 @@ void do_init_chrif(void) {
 	// send the user count every 10 seconds, to hide the charserver's online counting problem
 	add_timer_interval(gettick() + 1000, send_usercount_tochar, 0, 0, UPDATE_INTERVAL);
 }
+
+// (^~_~^) Gepard Shield Start
+int chrif_gepard_req_block(unsigned int unique_id, const char* violator_name, unsigned int violator_aid, const char* initiator_name, unsigned int initiator_aid, const char* unban_time_str, const char* reason_str)
+{
+	unsigned int offset;
+	char send_buffer[2 + 4 + 4 + 4 + GEPARD_TIME_STR_LENGTH + GEPARD_REASON_LENGTH + NAME_LENGTH + NAME_LENGTH];
+
+	chrif_check(-1);
+
+	memset(send_buffer, '\0', sizeof(send_buffer));
+
+	WBUFW(send_buffer, 0) = GEPARD_M2C_BLOCK_REQ;
+	WBUFL(send_buffer, 2) = unique_id;
+	WBUFL(send_buffer, 6) = violator_aid;
+	WBUFL(send_buffer,10) = initiator_aid;
+	offset = (2 + 4 + 4 + 4);
+
+	if (unban_time_str != NULL)
+		safestrncpy((char*)WBUFP(send_buffer, offset), unban_time_str, GEPARD_TIME_STR_LENGTH);
+	offset += GEPARD_TIME_STR_LENGTH;
+
+	if (reason_str != NULL)
+		safestrncpy((char*)WBUFP(send_buffer, offset), reason_str, GEPARD_REASON_LENGTH);
+	offset += GEPARD_REASON_LENGTH;
+
+	if (violator_name != NULL)
+		safestrncpy((char*)WBUFP(send_buffer, offset), violator_name, NAME_LENGTH);
+	offset += NAME_LENGTH;
+
+	if (initiator_name != NULL)
+		safestrncpy((char*)WBUFP(send_buffer, offset), initiator_name, NAME_LENGTH);
+	offset += NAME_LENGTH;
+
+	WFIFOHEAD(char_fd, offset);
+	memcpy((void*)WFIFOP(char_fd, 0), send_buffer, offset);
+	WFIFOSET(char_fd, offset);
+
+	return 0;
+}
+
+bool chrif_gepard_ack_block(int fd)
+{
+	struct map_session_data* sd;
+	int violator_aid, initiator_aid;
+	unsigned int unique_id, offset;
+	char reason_str[GEPARD_REASON_LENGTH];
+	char result_str[GEPARD_RESULT_STR_LENGTH];
+	char unban_time_str[GEPARD_TIME_STR_LENGTH];
+
+	unsigned int packet_len = (2 + 4 + 4 + 4 + GEPARD_TIME_STR_LENGTH + GEPARD_REASON_LENGTH + GEPARD_RESULT_STR_LENGTH);
+
+	if (RFIFOREST(fd) < packet_len)
+		return false;
+
+	unique_id = RFIFOL(fd, 2);
+	violator_aid = RFIFOL(fd, 6);
+	initiator_aid = RFIFOL(fd, 10);
+	offset = (2 + 4 + 4 + 4);
+
+	safestrncpy(unban_time_str, (char*)RFIFOP(fd, offset), GEPARD_TIME_STR_LENGTH);
+	offset += GEPARD_TIME_STR_LENGTH;
+
+	safestrncpy(reason_str, (char*)RFIFOP(fd, offset), GEPARD_REASON_LENGTH);
+	offset += GEPARD_REASON_LENGTH;
+
+	safestrncpy(result_str, (char*)RFIFOP(fd, offset), GEPARD_RESULT_STR_LENGTH);
+	offset += GEPARD_RESULT_STR_LENGTH;
+
+	if (violator_aid != 0 && (sd = map_id2sd(violator_aid)) != NULL)
+	{
+		char message_info[300];
+		struct s_mapiterator* iter;
+	
+		safesnprintf(message_info, 300, "Unique ID has been banned!\r\rDate of unban:  %s\r\rUnique id: %u\r\rReason: %s", unban_time_str, unique_id, reason_str);
+
+		iter = mapit_getallusers();
+
+		for (sd = (TBL_PC*)mapit_first(iter); mapit_exists(iter); sd = (TBL_PC*)mapit_next(iter))
+		{
+			if (session[sd->fd]->gepard_info.unique_id == unique_id)
+			{
+				gepard_send_info(sd->fd, GEPARD_INFO_BANNED, message_info);
+				session[sd->fd]->recv_crypt.pos_1 = rand() % 255;
+				session[sd->fd]->recv_crypt.pos_2 = rand() % 255;
+				session[sd->fd]->recv_crypt.pos_3 = rand() % 255;
+			}
+		}
+	
+		mapit_free(iter);
+	}
+
+	RFIFOSKIP(fd, offset);
+
+	if (initiator_aid != 0 && (sd = map_id2sd(initiator_aid)) != NULL)
+	{
+		clif_displaymessage(sd->fd, result_str);
+	}
+
+	return true;
+}
+
+int chrif_gepard_req_unblock(unsigned int unique_id, const char* violator_name, unsigned int violator_aid, unsigned int initiator_aid)
+{
+	unsigned int offset;
+	char send_buffer[2 + 4 + 4 + 4 + NAME_LENGTH];
+
+	chrif_check(-1);
+
+	memset(send_buffer, '\0', sizeof(send_buffer));
+
+	WBUFW(send_buffer, 0) = GEPARD_M2C_UNBLOCK_REQ;
+	WBUFL(send_buffer, 2) = unique_id;
+	WBUFL(send_buffer, 6) = violator_aid;
+	WBUFL(send_buffer,10) = initiator_aid;
+	offset = (2 + 4 + 4 + 4);
+
+	if (violator_name != NULL)
+		safestrncpy((char*)WBUFP(send_buffer, offset), violator_name, NAME_LENGTH);
+	offset += NAME_LENGTH;
+
+	WFIFOHEAD(char_fd, offset);
+	memcpy((void*)WFIFOP(char_fd, 0), send_buffer, offset);
+	WFIFOSET(char_fd, offset);
+
+	return 0;
+}
+
+bool chrif_gepard_ack_unblock(int fd)
+{
+	struct map_session_data* sd;
+	int initiator_aid, offset;
+	char result_str[GEPARD_RESULT_STR_LENGTH];
+	unsigned int packet_len = (2 + 4 + GEPARD_RESULT_STR_LENGTH);
+
+	if (RFIFOREST(fd) < packet_len)
+		return false;
+
+	initiator_aid = RFIFOL(fd, 2);
+	offset = 2 + 4;
+
+	safestrncpy(result_str, (char*)RFIFOP(fd, offset), GEPARD_RESULT_STR_LENGTH);
+	offset += GEPARD_RESULT_STR_LENGTH;
+
+	RFIFOSKIP(fd, offset);
+
+	if (initiator_aid != 0 && (sd = map_id2sd(initiator_aid)) != NULL)
+	{
+		clif_displaymessage(sd->fd, result_str);
+	}
+
+	return true;
+}
+
+int chrif_gepard_save_report(struct map_session_data* sd, const char* report_str)
+{
+	struct socket_data* s = session[sd->fd];
+
+	unsigned int offset;
+	char send_buffer[2 + 4 + 4 + 4 + GEPARD_REPORT_LENGTH + NAME_LENGTH];
+
+	chrif_check(-1); //Character is saved on reconnect.
+
+	memset(send_buffer, '\0', sizeof(send_buffer));
+
+	WBUFW(send_buffer, 0) = GEPARD_M2C_SAVE_REPORT;
+	WBUFL(send_buffer, 2) = s->gepard_info.unique_id;
+	WBUFL(send_buffer, 6) = sd->status.account_id;
+	WBUFL(send_buffer, 10) = sd->status.char_id;
+
+	offset = (2 + 4 + 4 + 4);
+
+	safestrncpy((char*)WBUFP(send_buffer, offset), sd->status.name, NAME_LENGTH);
+	offset += NAME_LENGTH;
+
+	safestrncpy((char*)WBUFP(send_buffer, offset), report_str, GEPARD_REPORT_LENGTH);
+	offset += GEPARD_REPORT_LENGTH;
+
+	WFIFOHEAD(char_fd, offset);
+	memcpy((void*)WFIFOP(char_fd, 0), send_buffer, offset);
+	WFIFOSET(char_fd, offset);
+
+	return 0;
+}
+
+// (^~_~^) Gepard Shield End
+

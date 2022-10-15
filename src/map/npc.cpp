@@ -4167,30 +4167,7 @@ static const char* npc_parse_mapflag(char* w1, char* w2, char* w3, char* w4, con
 			} else
 				map_setmapflag(m, MF_BATTLEGROUND, false);
 			break;
-			
-		case MF_DROPRATE50:
-			if (state) {
-			union u_mapflag_args args = {};
-			
-				if (sscanf(w4, "%11d", &args.flag_val) == 1)
-					map_setmapflag(m, MF_DROPRATE50, state);
-				else
-					map_setmapflag(m, MF_DROPRATE50, 100);
-				} else
-					map_setmapflag(m, MF_DROPRATE50, 100);
-			break;
-		case MF_DROPRATE300:
-			if (state) {
-			union u_mapflag_args args = {};
-			
-				if (sscanf(w4, "%11d", &args.flag_val) == 1)
-					map_setmapflag(m, MF_DROPRATE300, state);
-				else
-					map_setmapflag(m, MF_DROPRATE300, 100);
-				} else
-					map_setmapflag(m, MF_DROPRATE300, 100);
-			break;
-			
+
 		case MF_NOCOMMAND:
 			if (state) {
 				union u_mapflag_args args = {};

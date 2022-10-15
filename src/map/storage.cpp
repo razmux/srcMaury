@@ -809,9 +809,9 @@ bool storage_guild_additem(struct map_session_data* sd, struct s_storage* stor, 
 		return false;
 	}
 
-	//Reserved Items - DarbladErxX
-	if( item_data->card[0] == CARD0_CREATE && (char_id = MakeDWord(item_data->card[2],item_data->card[3])) > 0 && (char_id == battle_config.bg_reserved_char_id || char_id == battle_config.woe_reserved_char_id || char_id == battle_config.universal_reserved_char_id) && battle_config.reserved_can_trade )
-	{	// "Reserved's Items"
+	//Bg Items - DarbladErxX
+	if( item_data->card[0] == CARD0_CREATE && (char_id = MakeDWord(item_data->card[2],item_data->card[3])) > 0 && (char_id == battle_config.bg_reserved_char_id || char_id == battle_config.woe_reserved_char_id) && !battle_config.bg_can_trade )
+	{	// "Battleground's Items"
 		clif_displaymessage (sd->fd, msg_txt(sd,264));
 		return 1;
 	}

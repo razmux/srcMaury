@@ -13,7 +13,6 @@ struct battleground_member_data {
 	unsigned short x, y;
 	struct map_session_data *sd;
 	unsigned afk : 1;
-	bool ranked;
 };
 
 struct battleground_data {
@@ -88,10 +87,12 @@ int bg_team_warp(int bg_id, unsigned short mapindex, short x, short y);
 int bg_member_respawn(struct map_session_data *sd);
 int bg_send_message(struct map_session_data *sd, const char *mes, int len);
 int battleground_countlogin(struct map_session_data *sd, bool check_bat_room);
+void bg_team_getitem(int bg_id, int nameid, int amount);
 void bg_team_get_kafrapoints(int bg_id, int amount);
 void bg_team_getitem(int bg_id, int winlost);
 
 int bg_countlogin(struct map_session_data *sd, bool check_bat_room);
+void bg_team_getitem(int bg_id, int nameid, int amount);
 void bg_team_get_kafrapoints(int bg_id, int amount);
 void bg_team_rewards(int bg_id, int nameid, int amount, int kafrapoints, int quest_id, const char *var, int add_value, int bg_arena, int bg_result);
 

@@ -61,6 +61,82 @@ static inline uint32 client_tick( t_tick tick ){
 	return (uint32)tick;
 }
 
+// (^~_~^) Gepard Shield Start
+
+bool clif_gepard_process_packet(struct map_session_data* sd)
+{
+	int fd = sd->fd;
+	struct socket_data* s = session[fd];
+	int packet_id = RFIFOW(fd, 0);
+	long long diff_time = gettick() - session[fd]->gepard_info.sync_tick;
+
+	if (diff_time > 40000)
+	{
+		clif_authfail_fd(sd->fd, 15);
+		return true;
+	}
+
+	if (packet_id <= MAX_PACKET_DB)
+	{
+		return gepard_process_cs_packet(fd, s, packet_db[packet_id].len);
+	}
+
+	if (packet_id == CS_GEPARD_SYNC_2)
+	{
+		const unsigned int sync_packet_len = 128;
+		unsigned int control_value, info_type, info_code;
+
+		if (RFIFOREST(fd) < sync_packet_len)
+		{
+			return true;
+		}
+
+		gepard_enc_dec(RFIFOP(fd, 2), sync_packet_len - 2, &s->sync_crypt); 
+
+		control_value = control_value = RFIFOL(fd, 2); 
+
+		if (control_value != 0xDDCCBBAA)
+		{
+			RFIFOSKIP(fd, sync_packet_len);
+			return true;
+		}
+
+		s->gepard_info.sync_tick = gepard_get_tick();
+
+		info_type = RFIFOW(fd, 6);
+		info_code = RFIFOW(fd, 8);
+
+		if (info_type == 1 && info_code == 1)
+		{
+			const char* message = (const char*)RFIFOP(fd, 10);
+			chrif_gepard_save_report(sd, message);
+		}
+
+		RFIFOSKIP(fd, sync_packet_len);
+		return true;
+	}
+
+	return gepard_process_cs_packet(fd, s, 0);
+}
+
+// (^~_~^) Gepard Shield End
+
+// (^~_~^) LGP Start
+
+void clif_gepard_send_lgp_settings(struct map_session_data * sd)
+{
+	const unsigned int packet_size = 12;
+
+	WFIFOHEAD(sd->fd, packet_size);
+	WFIFOW(sd->fd, 0) = SC_GEPARD_SETTINGS;
+	WFIFOW(sd->fd, 2) = packet_size;
+	WFIFOL(sd->fd, 4) = 1; // LGP
+	WFIFOL(sd->fd, 8) = 1; // mode
+	WFIFOSET(sd->fd, packet_size);
+}
+
+// (^~_~^) LGP End
+
 /* for clif_clearunit_delayed */
 static struct eri *delay_clearunit_ers;
 
@@ -1019,7 +1095,6 @@ void clif_clearunit_delayed(struct block_list* bl, clr_type type, t_tick tick)
 
 void clif_get_weapon_view(struct map_session_data* sd, unsigned short *rhand, unsigned short *lhand)
 {
-	int cViewID = 0, cNameID = 0, wViewID = 0, wNameID = 0;
 	if(sd->sc.option&OPTION_COSTUME)
 	{
 		*rhand = *lhand = 0;
@@ -1030,23 +1105,16 @@ void clif_get_weapon_view(struct map_session_data* sd, unsigned short *rhand, un
 	*rhand = sd->status.weapon;
 	*lhand = sd->status.shield;
 #else
-	*rhand = 0;
-
-	if (sd->equip_index[EQI_SHADOW_WEAPON] > 0 &&
-		sd->inventory_data[sd->equip_index[EQI_SHADOW_WEAPON]]){
-		struct item_data* id = sd->inventory_data[sd->equip_index[EQI_SHADOW_WEAPON]];
-		cViewID = id->look;
-		cNameID = id->nameid;
-	} 	
 	if (sd->equip_index[EQI_HAND_R] >= 0 &&
-		sd->inventory_data[sd->equip_index[EQI_HAND_R]]){
+		sd->inventory_data[sd->equip_index[EQI_HAND_R]])
+	{
 		struct item_data* id = sd->inventory_data[sd->equip_index[EQI_HAND_R]];
-		wViewID = id->look;
-		wNameID = id->nameid;
-	} 
-	if (cViewID)		*rhand = cNameID;
-	else if (wViewID)	*rhand = wNameID;
-	else 				*rhand = 0;
+		if (id->view_id > 0)
+			*rhand = id->view_id;
+		else
+			*rhand = id->nameid;
+	} else
+		*rhand = 0;
 
 	if (sd->equip_index[EQI_HAND_L] >= 0 &&
 		sd->equip_index[EQI_HAND_L] != sd->equip_index[EQI_HAND_R] &&
@@ -1549,26 +1617,6 @@ void clif_weather(int16 m)
 	}
 	mapit_free(iter);
 }
-
-/**
- * Hide a NPC from the effects of Maya Purple card.
- * @param bl: Block data
- * @return True if NPC is disabled or false otherwise
- */
-static inline bool clif_npc_mayapurple(block_list *bl) {
-	nullpo_retr(false, bl);
-
-	if (bl->type == BL_NPC) {
-		npc_data *nd = map_id2nd(bl->id);
-
-		// TODO: Confirm if waitingroom cause any special cases
-		if (/* nd->chat_id == 0 && */ nd->sc.option & OPTION_INVISIBLE)
-			return true;
-	}
-
-	return false;
-}
-
 /**
  * Main function to spawn a unit on the client (player/mob/pet/etc)
  **/
@@ -1582,8 +1630,10 @@ int clif_spawn(struct block_list *bl)
 	if( !vd || vd->class_ == JT_INVISIBLE )
 		return 0;
 
-	// Hide NPC from Maya Purple card
-	if (clif_npc_mayapurple(bl))
+	/**
+	* Hide NPC from maya purple card.
+	**/
+	if(bl->type == BL_NPC && !((TBL_NPC*)bl)->chat_id && (((TBL_NPC*)bl)->sc.option&OPTION_INVISIBLE))
 		return 0;
 
 	len = clif_set_unit_idle(bl, buf,true);
@@ -1626,7 +1676,9 @@ int clif_spawn(struct block_list *bl)
 				clif_specialeffect(&md->bl,EF_GIANTBODY2,AREA);
 			else if(md->special_state.size==SZ_MEDIUM)
 				clif_specialeffect(&md->bl,EF_BABYBODY2,AREA);
-			if (md->option.hp_show == 1 || battle_config.monster_hp_bars_info == 2 )
+			if (md->option.hp_show == 1 )
+			clif_monster_hp_bar_area(md);
+			if (battle_config.monster_hp_bars_info == 2)
 			clif_monster_hp_bar_area(md);
 		}
 		break;
@@ -1889,7 +1941,6 @@ static void clif_move2(struct block_list *bl, struct view_data *vd, struct unit_
 				clif_specialeffect(&sd->bl,EF_BABYBODY2,AREA);
 			if (sd->status.robe)
 				clif_refreshlook(bl,bl->id,LOOK_ROBE,sd->status.robe,AREA);
-				map_foreachinallrange(clif_hideview, &sd->bl, AREA_SIZE, BL_PC, &sd->bl);
 		}
 		break;
 	case BL_MOB:
@@ -1936,8 +1987,10 @@ void clif_move(struct unit_data *ud)
 		return;
 	}
 
-	// Hide NPC from Maya Purple card
-	if (clif_npc_mayapurple(bl))
+	/**
+	* Hide NPC from maya purple card.
+	**/
+	if(bl->type == BL_NPC && !((TBL_NPC*)bl)->chat_id && (((TBL_NPC*)bl)->sc.option&OPTION_INVISIBLE))
 		return;
 
 	if (ud->state.speed_changed) {
@@ -2142,22 +2195,13 @@ void clif_selllist(struct map_session_data *sd)
 		{
 			if( !pc_can_sell_item(sd, &sd->inventory.u.items_inventory[i], nd->subtype))
 				continue;
-
 			if( sd->inventory.u.items_inventory[i].card[0] == CARD0_CREATE )
-			{ // Do not allow sell BG, Woe, Universal, Costume
+			{ // Do not allow sell BG - Ancient Items
 				char_id = MakeDWord(sd->inventory.u.items_inventory[i].card[2],sd->inventory.u.items_inventory[i].card[3]);
 				if( battle_config.bg_reserved_char_id && char_id == battle_config.bg_reserved_char_id )
 					continue;
-
 				if( battle_config.woe_reserved_char_id && char_id == battle_config.woe_reserved_char_id )
 					continue;
-
-				if( battle_config.universal_reserved_char_id && char_id == battle_config.universal_reserved_char_id )
-					continue;
-
-				if( battle_config.costume_reserved_char_id && char_id == battle_config.costume_reserved_char_id )
-					continue;
-
 			}
 			val=sd->inventory_data[i]->value_sell;
 			if( val < 0 )
@@ -4827,8 +4871,10 @@ void clif_getareachar_unit(struct map_session_data* sd,struct block_list *bl)
 	if (!vd || vd->class_ == JT_INVISIBLE)
 		return;
 
-	// Hide NPC from Maya Purple card
-	if (clif_npc_mayapurple(bl))
+	/**
+	* Hide NPC from maya purple card.
+	**/
+	if(bl->type == BL_NPC && !((TBL_NPC*)bl)->chat_id && (((TBL_NPC*)bl)->sc.option&OPTION_INVISIBLE))
 		return;
 
 	ud = unit_bl2ud(bl);
@@ -4858,7 +4904,6 @@ void clif_getareachar_unit(struct map_session_data* sd,struct block_list *bl)
 				clif_refreshlook(&sd->bl,bl->id,LOOK_ROBE,tsd->status.robe,SELF);
 			clif_efst_status_change_sub(&sd->bl, bl, SELF);
 			clif_hat_effects(sd,bl,SELF);
-			map_foreachinallrange(clif_hideview, &sd->bl, AREA_SIZE, BL_PC, &sd->bl);
 		}
 		break;
 	case BL_MER: // Devotion Effects
@@ -4886,7 +4931,7 @@ void clif_getareachar_unit(struct map_session_data* sd,struct block_list *bl)
 			else if(md->special_state.size==SZ_MEDIUM)
 				clif_specialeffect_single(bl,EF_BABYBODY2,sd->fd);
 			if (md->option.hp_show == 1)
-				clif_hpmeter_single(sd->fd, md->bl.id, md->status.hp, md->status.max_hp);
+				clif_monster_hp_bar_area(md);
 #if PACKETVER >= 20120404
 				if ( battle_config.monster_hp_bars_info && !map_getmapflag(bl->m, MF_HIDEMOBHPBAR) ){
 				if (battle_config.monster_hp_bars_info == 2) {
@@ -5293,6 +5338,40 @@ void clif_getareachar_skillunit(struct block_list *bl, struct skill_unit *unit, 
 	header = 0x09ca;
 #endif
 
+// (^~_~^) LGP Start
+
+	switch (unit->group->skill_id)
+	{
+		case WZ_STORMGUST:
+		{
+			if (&unit->group->unit[unit->group->unit_count / 2] == unit)
+			{
+				unit_id = 0x10;
+			}
+		}
+		break;
+
+		case WZ_VERMILION:
+		{
+			if (&unit->group->unit[unit->group->unit_count / 2] == unit)
+			{
+				unit_id = 0x12;
+			}
+		}
+		break;
+
+		case AL_PNEUMA:
+		{
+			if (&unit->group->unit[unit->group->unit_count / 2] != unit)
+			{
+				return;
+			}
+		}
+		break;
+	}
+
+// (^~_~^) LGP End
+
 	len = packet_len(header);
 	WBUFW(buf,pos) = header;
 	if (header != 0x011f) {
@@ -5494,55 +5573,6 @@ int clif_insight(struct block_list *bl,va_list ap)
 	}
 	if (sd && sd->fd) { //Tell sd that tbl walked into his view
 		clif_getareachar_unit(sd,tbl);
-	}
-	return 0;
-}
-
-/*==========================================
- * Change players views with hideview state
- *------------------------------------------*/
-int clif_hideview(struct block_list *bl,va_list ap)
-{
-	struct block_list *tbl;
-	struct view_data *vd;
-	TBL_PC *sd, *tsd;
-	tbl=va_arg(ap,struct block_list*);
-	vd = status_get_viewdata(bl);
-
-	sd = BL_CAST(BL_PC, bl);
-	tsd = BL_CAST(BL_PC, tbl);
-
-	if (tsd && tsd->fd) {
-		if(sd != tsd){
-			if (tbl->type == BL_PC && tsd->state.hideview) {
-				if(tsd->state.hideview&16){
-					if(tsd->state.hideview&1) clif_refreshlook(&tsd->bl,tsd->bl.id,LOOK_HEAD_TOP,0,SELF);
-					if(tsd->state.hideview&2) clif_refreshlook(&tsd->bl,tsd->bl.id,LOOK_HEAD_MID,0,SELF);
-					if(tsd->state.hideview&4) clif_refreshlook(&tsd->bl,tsd->bl.id,LOOK_HEAD_BOTTOM,0,SELF);
-					if(tsd->state.hideview&8) clif_refreshlook(&tsd->bl,tsd->bl.id,LOOK_ROBE,0,SELF);
-				}
-				if(tsd->state.hideview&1) clif_refreshlook(&tsd->bl,sd->bl.id,LOOK_HEAD_TOP,0,SELF);
-				if(tsd->state.hideview&2) clif_refreshlook(&tsd->bl,sd->bl.id,LOOK_HEAD_MID,0,SELF);
-				if(tsd->state.hideview&4) clif_refreshlook(&tsd->bl,sd->bl.id,LOOK_HEAD_BOTTOM,0,SELF);
-				if(tsd->state.hideview&8) clif_refreshlook(&tsd->bl,sd->bl.id,LOOK_ROBE,0,SELF);
-			}
-		}
-	}
-	if (sd && sd->fd) {
-		if(sd != tsd){
-			if (bl->type == BL_PC && sd->state.hideview) {
-				if(sd->state.hideview&16){
-					if(sd->state.hideview&1) clif_refreshlook(&sd->bl,bl->id,LOOK_HEAD_TOP,0,SELF);
-					if(sd->state.hideview&2) clif_refreshlook(&sd->bl,bl->id,LOOK_HEAD_MID,0,SELF);
-					if(sd->state.hideview&4) clif_refreshlook(&sd->bl,bl->id,LOOK_HEAD_BOTTOM,0,SELF);
-					if(sd->state.hideview&8) clif_refreshlook(&sd->bl,bl->id,LOOK_ROBE,0,SELF);
-				}
-				if(sd->state.hideview&1) clif_refreshlook(&sd->bl,tsd->bl.id,LOOK_HEAD_TOP,0,SELF);
-				if(sd->state.hideview&2) clif_refreshlook(&sd->bl,tsd->bl.id,LOOK_HEAD_MID,0,SELF);
-				if(sd->state.hideview&4) clif_refreshlook(&sd->bl,tsd->bl.id,LOOK_HEAD_BOTTOM,0,SELF);
-				if(sd->state.hideview&8) clif_refreshlook(&sd->bl,tsd->bl.id,LOOK_ROBE,0,SELF);
-			}
-		}
 	}
 	return 0;
 }
@@ -10806,6 +10836,16 @@ void clif_parse_WantToConnection(int fd, struct map_session_data* sd)
 #endif
 	session[fd]->session_data = sd;
 
+// (^~_~^) Gepard Shield Start
+
+	if (is_gepard_active)
+	{
+		gepard_init(session[fd], fd, GEPARD_MAP);
+		session[fd]->gepard_info.sync_tick = gettick();
+	}
+
+// (^~_~^) Gepard Shield End
+
 	pc_setnewpc(sd, account_id, char_id, login_id1, client_tick, sex, fd);
 
 #if PACKETVER < 20070521
@@ -11050,8 +11090,6 @@ void clif_parse_LoadEndAck(int fd,struct map_session_data *sd)
 			//Login Event
 			npc_script_event(sd, NPCE_LOGIN);
 		}
-		// [CreativeSD]: Autovend
-		sd->autovend.active = false;
 	} else {
 		//For some reason the client "loses" these on warp/map-change.
 		clif_updatestatus(sd,SP_STR);
@@ -11954,7 +11992,6 @@ void clif_parse_WisMessage(int fd, struct map_session_data* sd)
 		return;
 	}
 
-
 	// if player ignores everyone
 	if (dstsd->state.ignoreAll && pc_get_group_level(sd) <= pc_get_group_level(dstsd)) {
 		if (pc_isinvisible(dstsd) && pc_get_group_level(sd) < pc_get_group_level(dstsd))
@@ -11963,19 +12000,6 @@ void clif_parse_WisMessage(int fd, struct map_session_data* sd)
 			clif_wis_end(fd, 3); // 3: everyone ignored by target
 		return;
 	}
-
-	// if player is @afk. - MediaFire[DarbladErxX]
-	if( dstsd->state.afk == 1 )
-	{
-		char output_afk[CHAT_SIZE_MAX];
-		
-		clif_wis_end(fd, 0); // 0: success to send wisper
-		sprintf(output_afk, "(AFK) \"%s\"", dstsd->state.afk_msg); // (away) \"%s\" 
-		clif_wis_message(sd, dstsd->status.name, output_afk, strlen(output_afk) + 1, 0);	// send @afk message to sender
-		clif_wis_message(dstsd, sd->status.name, message, strlen(message) + 1, 0);	// show meesage from sender
-		return;
-	}
-
 
 	// if player is autotrading
 	if (dstsd->state.autotrade == 1){
@@ -18581,7 +18605,6 @@ void clif_instance_changestatus(unsigned int instance_id, int type, unsigned int
 }
 
 
-
 /// Notifies clients about item picked up by a party member (ZC_ITEM_PICKUP_PARTY).
 /// 02b8 <account id>.L <name id>.W <identified>.B <damaged>.B <refine>.B <card1>.W <card2>.W <card3>.W <card4>.W <equip location>.W <item type>.B
 void clif_party_show_picker(struct map_session_data * sd, struct item * item_data)
@@ -19738,9 +19761,6 @@ void clif_parse_reqworldinfo(int fd,struct map_session_data *sd) {
 	if(sd) 
 		clif_ackworldinfo(sd);
 }
-
-
-
 
 /// unknown usage (CZ_BLOCKING_PLAY_CANCEL)
 /// 0447
@@ -21067,21 +21087,6 @@ void clif_hat_effects( struct map_session_data* sd, struct block_list* bl, enum 
 }
 
 void clif_hat_effect_single( struct map_session_data* sd, uint16 effectId, bool enable ){
-#if PACKETVER >= 20150513
-	unsigned char buf[13];
-
-	WBUFW(buf,0) = 0xa3b;
-	WBUFW(buf,2) = 13;
-	WBUFL(buf,4) = sd->bl.id;
-	WBUFB(buf,8) = enable;
-	WBUFL(buf,9) = effectId;
-
-	clif_send(buf,13,&sd->bl,AREA);
-#endif
-}
-
-//MvPBoard [DarbladErxX]
-void clif_hat_effect_singlemvp( struct map_session_data* sd, uint16 effectId, bool enable ){
 #if PACKETVER >= 20150513
 	unsigned char buf[13];
 
@@ -22444,6 +22449,15 @@ static int clif_parse(int fd)
 
 	if (RFIFOREST(fd) < 2)
 		return 0;
+
+// (^~_~^) Gepard Shield Start
+
+	if (is_gepard_active == true && sd != NULL && clif_gepard_process_packet(sd) == true)
+	{
+		return 0;
+	}
+
+// (^~_~^) Gepard Shield End
 
 	cmd = RFIFOW(fd, 0);
 

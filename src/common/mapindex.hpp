@@ -6,7 +6,7 @@
 
 #include "../common/mmo.hpp"
 
-#define MAX_MAPINDEX 4000
+#define MAX_MAPINDEX 2000
 
 //Some definitions for the mayor city maps.
 #define MAP_ARLANDRIA "arlandria"
@@ -52,7 +52,7 @@
 #define MAP_ECLAGE "eclage"
 #define MAP_ECLAGE_IN "ecl_in01"
 #define MAP_LASAGNA "lasagna"
-#define MAP_MERCADOZENY "gold_mart"
+#define MAP_MERCADOZENY "mercado"
 #define MAP_MERCADONPC "ayothaya"
 
 const char* mapindex_getmapname(const char* string, char* output);

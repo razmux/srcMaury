@@ -717,13 +717,11 @@ ACMD_FUNC(who) {
 				}
 				case 3: {
 					if (pc_has_permission(sd, PC_PERM_WHO_DISPLAY_AID))
-						StringBuf_Printf(&buf, msg_txt(sd,912), pl_sd->status.char_id, pl_sd->autovend.account_id ? pl_sd->autovend.account_id : pl_sd->status.account_id);	// "(CID:%d/AID:%d) "
+						StringBuf_Printf(&buf, msg_txt(sd,912), pl_sd->status.char_id, pl_sd->status.account_id);	// "(CID:%d/AID:%d) "
 					StringBuf_Printf(&buf, msg_txt(sd,343), pl_sd->status.name); // "Name: %s "
 					if (pc_get_group_id(pl_sd) > 0) // Player title, if exists
 						StringBuf_Printf(&buf, msg_txt(sd,344), pc_group_id2name(pc_get_group_id(pl_sd))); // "(%s) "
-					StringBuf_Printf(&buf, msg_txt(sd, 348), mapindex_id2name(pl_sd->mapindex), pl_sd->bl.x, pl_sd->bl.y); // "| Location: %s %d %d"
-					if(pl_sd->autovend.account_id) // Autovend
-						StringBuf_Printf(&buf, msg_txt(sd, 810)); // "| Autovend
+					StringBuf_Printf(&buf, msg_txt(sd,348), mapindex_id2name(pl_sd->mapindex), pl_sd->bl.x, pl_sd->bl.y); // "| Location: %s %d %d"
 					break;
 				}
 				default: {
@@ -1910,54 +1908,54 @@ ACMD_FUNC(go)
 		char map[MAP_NAME_LENGTH];
 		int x, y;
 	} data[] = {
-		{ MAP_ARLANDRIA,   155, 192 }, //  0=Arlandria
-		{ MAP_MORROC,      156,  93 }, //  1=Morroc
-		{ MAP_GEFFEN,      119,  59 }, //  2=Geffen
-		{ MAP_PAYON,       162, 233 }, //  3=Payon
-		{ MAP_ALBERTA,     192, 147 }, //  4=Alberta
+		{ MAP_ARLANDRIA,   155, 179 }, //  0=Arlandria
+		{ MAP_MORROC,      159,  92 }, //  1=Morroc
+		{ MAP_GEFFEN,      120,  70 }, //  2=Geffen
+		{ MAP_PAYON,       171, 102 }, //  3=Payon
+		{ MAP_ALBERTA,     117, 56 }, //  4=Alberta
 #ifdef RENEWAL
-		{ MAP_IZLUDE,      128, 146 }, //  5=Izlude (Renewal)
+		{ MAP_IZLUDE,      127, 148 }, //  5=Izlude (Renewal)
 #else
-		{ MAP_IZLUDE,      128, 114 }, //  5=Izlude
+		{ MAP_IZLUDE,      127, 148 }, //  5=Izlude
 #endif
-		{ MAP_ALDEBARAN,   140, 131 }, //  6=Al de Baran
-		{ MAP_LUTIE,       147, 134 }, //  7=Lutie
-		{ MAP_COMODO,      209, 143 }, //  8=Comodo
-		{ MAP_YUNO,        157,  51 }, //  9=Yuno
-		{ MAP_AMATSU,      198,  84 }, // 10=Amatsu
-		{ MAP_GONRYUN,     160, 120 }, // 11=Gonryun
-		{ MAP_UMBALA,       89, 157 }, // 12=Umbala
-		{ MAP_NIFLHEIM,     21, 153 }, // 13=Niflheim
-		{ MAP_LOUYANG,     217,  40 }, // 14=Louyang
+		{ MAP_ALDEBARAN,   139, 116 }, //  6=Al de Baran
+		{ MAP_LUTIE,       147, 123 }, //  7=Lutie
+		{ MAP_COMODO,      189, 157 }, //  8=Comodo
+		{ MAP_YUNO,        158,  182 }, //  9=Yuno
+		{ MAP_AMATSU,      111,  147 }, // 10=Amatsu
+		{ MAP_GONRYUN,     159, 111 }, // 11=Gonryun
+		{ MAP_UMBALA,       143, 161 }, // 12=Umbala
+		{ MAP_NIFLHEIM,     194, 186 }, // 13=Niflheim
+		{ MAP_LOUYANG,     217,  104 }, // 14=Louyang
 #ifdef RENEWAL
-		{ MAP_NOVICE,       18, 26  }, // 15=Training Grounds (Renewal)
+		{ MAP_NOVICE,       48, 81  }, // 15=Training Grounds (Renewal)
 #else
-		{ MAP_NOVICE,       53, 111 }, // 15=Training Grounds
+		{ MAP_NOVICE,       48, 81 }, // 15=Training Grounds
 #endif
 		{ MAP_JAIL,         23,  61 }, // 16=Prison
-		{ MAP_JAWAII,      249, 127 }, // 17=Jawaii
+		{ MAP_JAWAII,      217, 228 }, // 17=Jawaii
 		{ MAP_AYOTHAYA,    151, 117 }, // 18=Ayothaya
-		{ MAP_EINBROCH,     64, 200 }, // 19=Einbroch
+		{ MAP_EINBROCH,     64, 197 }, // 19=Einbroch
 		{ MAP_LIGHTHALZEN, 158,  92 }, // 20=Lighthalzen
 		{ MAP_EINBECH,      70,  95 }, // 21=Einbech
 		{ MAP_HUGEL,        96, 145 }, // 22=Hugel
-		{ MAP_RACHEL,      130, 110 }, // 23=Rachel
-		{ MAP_VEINS,       216, 123 }, // 24=Veins
-		{ MAP_MOSCOVIA,    223, 184 }, // 25=Moscovia
-		{ MAP_MIDCAMP,     180, 240 }, // 26=Midgard Camp
+		{ MAP_RACHEL,      115, 135 }, // 23=Rachel
+		{ MAP_VEINS,       217, 126 }, // 24=Veins
+		{ MAP_MOSCOVIA,    222, 190 }, // 25=Moscovia
+		{ MAP_MIDCAMP,     218, 237 }, // 26=Midgard Camp
 		{ MAP_MANUK,       282, 138 }, // 27=Manuk
 		{ MAP_SPLENDIDE,   201, 147 }, // 28=Splendide
-		{ MAP_BRASILIS,    182, 239 }, // 29=Brasilis
-		{ MAP_DICASTES,    198, 187 }, // 30=El Dicastes
-		{ MAP_MORA,         44, 151 }, // 31=Mora
-		{ MAP_DEWATA,      200, 180 }, // 32=Dewata
-		{ MAP_MALANGDO,    140, 114 }, // 33=Malangdo Island
-		{ MAP_MALAYA,      242, 211 }, // 34=Malaya Port
-		{ MAP_ECLAGE,      110,  39 }, // 35=Eclage
+		{ MAP_BRASILIS,    196, 216 }, // 29=Brasilis
+		{ MAP_DICASTES,    198, 189 }, // 30=El Dicastes
+		{ MAP_MORA,        110, 105 }, // 31=Mora
+		{ MAP_DEWATA,      200, 178 }, // 32=Dewata
+		{ MAP_MALANGDO,    166, 134 }, // 33=Malangdo Island
+		{ MAP_MALAYA,      281, 251 }, // 34=Malaya Port
+		{ MAP_ECLAGE,      174,  201 }, // 35=Eclage
 		{ MAP_LASAGNA,     193, 182 }, // 36=Lasagna
-		{ MAP_PRONTERA,    156, 191 }, //  37=Prontera
+		{ MAP_PRONTERA,    155, 176 }, //  37=Prontera
 		{ MAP_MERCADOZENY,  100, 13 },  // 38 = Mercado Zeny
-		{ MAP_MERCADONPC,  151, 166 },  // 39 = Mercado NPC
+		{ MAP_MERCADONPC,  150, 164 },  // 39 = Mercado NPC
 	};
 
 	nullpo_retr(-1, sd);
@@ -11691,201 +11689,270 @@ ACMD_FUNC(bgpoints)
 	return 0;
 }
 
-/*==========================================
-* Edited by DarbladErxX taken from @afk by unknown??
-* @afk
-* Turns on/off logout on player with @away
-*------------------------------------------*/
-ACMD_FUNC(afk)
+// (^~_~^) Gepard Shield Start
+
+ACMD_FUNC(gepard_block_nick)
 {
-	char temp_msg[CHAT_SIZE_MAX];
-		
+	struct map_session_data* violator_sd;
+	time_t time_server;
+	unsigned int duration;
+	unsigned int violator_account_id = 0;
+	unsigned int violator_unique_id = 0;
+	char reason_str[GEPARD_REASON_LENGTH];
+	char unban_time_str[GEPARD_TIME_STR_LENGTH];
+	char duration_type, violator_name[NAME_LENGTH];
+	const char* command_info = "Wrong input (usage: @gepard_block_nick <duration> <duration_type m/h/d> \"<char name>\" <reason>)";
+
 	nullpo_retr(-1, sd);
-	
-	memset(temp_msg, '\0', sizeof(temp_msg));
 
-	if ( sd->state.afk == 0 ) {
-		if(map_getmapflag(sd->bl.m, MF_PVP) || map_getmapflag(sd->bl.m, MF_GVG) || map_getmapflag(sd->bl.m, MF_GVG_CASTLE) || map_getmapflag(sd->bl.m, MF_BATTLEGROUND) ) {
-        	        clif_displaymessage(fd, "No puedes usar @afk en PVP, GVG o BG Maps.");
-        	        return -1;
-		}
-	}
+	memset(atcmd_player_name, '\0', sizeof(atcmd_player_name));
 
-	if( pc_isdead(sd) ) {
-			clif_displaymessage(fd, "No puedes usar @afk muerto.");
-			return -1;
-		}
-	
-	if( map_getmapflag(sd->bl.m, MF_AUTOTRADE) == battle_config.autotrade_mapflag )
+	if (!*message || sscanf(message, "%u %c \"%23[^\"]\" %99[^\n]", &duration, &duration_type, violator_name, reason_str) < 4)
 	{
+		clif_displaymessage(fd, command_info);
+		return -1;
+	}
 
-	if ( sd->state.afk == 1)
+	time(&time_server);
+
+	switch (duration_type)
 	{
-		sd->state.afk = 0;
-		clif_specialeffect(&sd->bl, 234,AREA);  
-		chat_leavechat(sd,0);
-		pc_setstand(sd,false);
-		clif_standing(&sd->bl);
-		clif_changelook(&sd->bl,LOOK_HEAD_TOP,0);
-		sd->sc.opt1 = OPT3_NORMAL;
-		pc_setoption(sd, sd->sc.option);
-		clif_displaymessage(fd, "@afk ha sido desactivado.");
-		return 0;
+		case 'm':
+			time_server += (duration * 60);
+		break;
+
+		case 'h':
+			time_server += (duration * 3600);
+		break;
+
+		case 'd':
+			time_server += (duration * 86400);
+		break;
+
+		default:
+			duration = 0;
+		break;
 	}
 
-		if (!message || !*message || sscanf(message, "%255[^\n]", temp_msg) < 1)
-		{
-
-			clif_displaymessage(fd,"Usa: @afk <Mensaje de espera>) || Usa @afk para desactivarlo");
-			return -1;
-
-		} else {
-			sd->state.afk = 1;
-			sscanf(message, "%255[^\n]", sd->state.afk_msg);
-			chat_createpcchat(sd, "[ A.F.K ]", "", 1, 1);	//create chat room with title
-			pc_setsit(sd);
-			skill_sit(sd,1);
-			clif_sitting(&sd->bl);
-			clif_changelook(&sd->bl,LOOK_HEAD_TOP,471);
-			clif_specialeffect(&sd->bl, 234,AREA);
-			sd->sc.opt1 = OPT1_STONE;
-			pc_setoption(sd, sd->sc.option);
-			clif_displaymessage(fd, "@afk ha sido activado.");   
-		}
-	
-	} else
-		clif_displaymessage(fd,"@afk no esta permitido en este mapa");
-		return 0;
-}
-
-ACMD_FUNC(wrestock) 
-{
-	int i = 0;
-	char display[100];
-	nullpo_retr(-1, sd);
-	
-	for ( i = 0; i < sizeof(struct RESTOCK); i++ ) 
+	if (duration == 0)
 	{
-		if ( RESTOCK[i].item_id == 0 || RESTOCK[i].quantity == 0 || strlen(RESTOCK[i].item_name) < 2) 
-			continue;
-		else
-		{
-			sprintf(display,"[%s]: %d.", RESTOCK[i].item_name, RESTOCK[i].quantity);
-			clif_displaymessage(fd,display);
-		}
+		clif_displaymessage(fd, command_info);
+		return -1;
 	}
+
+	strftime(unban_time_str, sizeof(unban_time_str), "%Y-%m-%d %H:%M:%S", localtime(&time_server)); 
+
+	sprintf(atcmd_output, "Request: block by name - %s", violator_name);
+	clif_displaymessage(fd, atcmd_output);
+
+	violator_sd = map_nick2sd(violator_name, false);
+
+	if (violator_sd != NULL)
+	{
+		violator_account_id = violator_sd->status.account_id;
+		violator_unique_id = session[violator_sd->fd]->gepard_info.unique_id;
+	}
+
+	chrif_gepard_req_block(violator_unique_id, violator_name, violator_account_id, sd->status.name, sd->status.account_id, unban_time_str, reason_str);
+
 	return 0;
 }
 
-/**
- *	OBORO CONTROL PANEL
- *	NANOSOFT (C)
- */
-ACMD_FUNC(restock) 
-{
-	char output[CHAT_SIZE_MAX];
-	if ( !sd->state.restock ) 
-		sd->state.restock = 1;
-	else
-		sd->state.restock = 0;
-	strcpy(output ,(sd->state.restock? "Restock Activado":"Restock Desactivado"));
-	clif_displaymessage(fd,output);
-	return 0;
-}
+// (^~_~^) Gepard Shield End
 
-ACMD_FUNC(reloadrestock) 
-{
-	READ_RESTOCK();
-	clif_displaymessage(fd,"[Done]: Restock reloaded");
-	return 0;
-}
+// (^~_~^) Gepard Shield Start
 
-ACMD_FUNC(autovend)
+ACMD_FUNC(gepard_block_account_id)
 {
+	struct map_session_data* violator_sd;
+	time_t time_server;
+	unsigned int duration;
+	unsigned int violator_account_id = 0;
+	unsigned int violator_unique_id = 0;
+	char reason_str[GEPARD_REASON_LENGTH];
+	char duration_type, unban_time_str[GEPARD_TIME_STR_LENGTH];
+	const char* command_info = "Wrong input (usage: @gepard_block_account_id <duration> <duration_type m/h/d> <account ID> <reason>)";
+
 	nullpo_retr(-1, sd);
 
-	if (!battle_config.feature_autovend) {
-		clif_displaymessage(fd, msg_txt(sd, 806)); // Autovend is not activated.
+	memset(atcmd_player_name, '\0', sizeof(atcmd_player_name));
+
+	if (!*message || sscanf(message, "%u %c %u %99[^\n]", &duration, &duration_type, &violator_account_id, reason_str) < 4)
+	{
+		clif_displaymessage(fd, command_info);
 		return -1;
 	}
 
-	if (map_getmapflag(sd->bl.m, MF_AUTOTRADE) != battle_config.autotrade_mapflag) {
-		clif_displaymessage(fd, msg_txt(sd, 807)); // Autovend is not allowed on this map.
+	time(&time_server);
+
+	switch (duration_type)
+	{
+		case 'm':
+			time_server += (duration * 60);
+		break;
+
+		case 'h':
+			time_server += (duration * 3600);
+		break;
+
+		case 'd':
+			time_server += (duration * 86400);
+		break;
+
+		default:
+			duration = 0;
+		break;
+	}
+
+	if (duration == 0)
+	{
+		clif_displaymessage(fd, command_info);
 		return -1;
 	}
 
-	if (pc_isdead(sd)) {
-		clif_displaymessage(fd, msg_txt(sd, 808)); // You cannot autovend when dead.
-		return -1;
+	strftime(unban_time_str, sizeof(unban_time_str), "%Y-%m-%d %H:%M:%S", localtime(&time_server)); 
+
+	sprintf(atcmd_output, "Request: block by account ID: %u", violator_account_id);
+	clif_displaymessage(fd, atcmd_output);
+
+	violator_sd = map_id2sd(violator_account_id);
+
+	if (violator_sd != NULL)
+	{
+		violator_account_id = violator_sd->status.account_id;
+		violator_unique_id = session[violator_sd->fd]->gepard_info.unique_id;
 	}
 
-	if (!sd->state.vending) { //check if player is vending
-		clif_displaymessage(fd, msg_txt(sd, 809)); // "You should have a shop open to use @autovend."
-		return -1;
-	}
+	chrif_gepard_req_block(violator_unique_id, atcmd_player_name, violator_account_id, sd->status.name, sd->status.account_id, unban_time_str, reason_str);
 
-	return vending_create_autovend(sd);
-}
-
-/*==========================================
- * @hideview by Haruka Mayumi
- * disable viewdata's
- *------------------------------------------*/
-ACMD_FUNC(hideview)
-{
-	int val = 0, view = 0;
-	char type[CHAT_SIZE_MAX];
-	
-	nullpo_retr(-1, sd);
-	memset(atcmd_output, '\0', sizeof(atcmd_output));
-	
-	parent_cmd = atcommand_checkalias(command+1);
-	
-	if( strcmp(parent_cmd, "hideview") == 0 ){
-		if((sscanf(message, "%s %11d", &type, &view)) < 1 || (view > 15 || view < 1)){
-			clif_displaymessage(fd, "Usage: @hideview {<type>} {<position>}");
-			clif_displaymessage(fd, "type: all - all players {<position>} view | other - other players {<position>} view");
-			clif_displaymessage(fd, "Position: 1 - top | 2 - mid | 4 - bottom | 8 - robe");
-			clif_displaymessage(fd, "Sample: \"@hideview other\" 7 ( 1 + 2 + 4 = 7 will hide other players top mid bot equipments)");
-			return -1;
-		}
-		if((strncmp(type, "all", 3) == 0))
-			val += 16;
-
-		if(view&1) val += 1;
-		if(view&2) val += 2;
-		if(view&4) val += 4;
-		if(view&8) val += 8;
-		
-		sd->state.hideview = val;
-		clif_refresh(sd);
-		if((strncmp(message, "others", 3) == 0) || (val&16)){
-			clif_refreshlook(&sd->bl,sd->bl.id,LOOK_HEAD_TOP,sd->status.head_top,SELF);
-			clif_refreshlook(&sd->bl,sd->bl.id,LOOK_HEAD_MID,sd->status.head_mid,SELF);
-			clif_refreshlook(&sd->bl,sd->bl.id,LOOK_HEAD_BOTTOM,sd->status.head_bottom,SELF);
-			clif_refreshlook(&sd->bl,sd->bl.id,LOOK_ROBE,sd->status.robe,SELF);
-		}
-		if(val&16){
-			if(val&1) clif_refreshlook(&sd->bl,sd->bl.id,LOOK_HEAD_TOP,0,SELF);
-			if(val&2) clif_refreshlook(&sd->bl,sd->bl.id,LOOK_HEAD_MID,0,SELF);
-			if(val&4) clif_refreshlook(&sd->bl,sd->bl.id,LOOK_HEAD_BOTTOM,0,SELF);
-			if(val&8) clif_refreshlook(&sd->bl,sd->bl.id,LOOK_ROBE,0,SELF);
-		}
-		sprintf(atcmd_output, "%s players equip view are now hidden",(strncmp(type, "others", 3)) ? "Other":"All");
-		clif_displaymessage(fd, atcmd_output);
-		clif_displaymessage(fd, "Use @showview to show all players equip view");
-	} else if(strcmp(parent_cmd, "showview") == 0){
-		sd->state.hideview = 0;
-		clif_displaymessage(fd, "All players view are now shown.)");
-		clif_refresh(sd);
-		clif_refreshlook(&sd->bl,sd->bl.id,LOOK_HEAD_TOP,sd->status.head_top,SELF);
-		clif_refreshlook(&sd->bl,sd->bl.id,LOOK_HEAD_MID,sd->status.head_mid,SELF);
-		clif_refreshlook(&sd->bl,sd->bl.id,LOOK_HEAD_BOTTOM,sd->status.head_bottom,SELF);
-		clif_refreshlook(&sd->bl,sd->bl.id,LOOK_ROBE,sd->status.robe,SELF);
-	}
-	
 	return 0;
 }
+
+ACMD_FUNC(gepard_block_unique_id)
+{
+	time_t time_server;
+	unsigned int duration;
+	unsigned int violator_unique_id = 0;
+	char reason_str[GEPARD_REASON_LENGTH];
+	char duration_type, unban_time_str[GEPARD_TIME_STR_LENGTH];
+	const char* command_info = "Wrong input (usage: @gepard_block_unique_id <duration> <duration_type m/h/d> <unique ID> <reason>)";
+
+	nullpo_retr(-1, sd);
+
+	memset(atcmd_player_name, '\0', sizeof(atcmd_player_name));
+
+	if (!*message || sscanf(message, "%u %c %u %99[^\n]", &duration, &duration_type, &violator_unique_id, reason_str) < 4)
+	{
+		clif_displaymessage(fd, command_info);
+		return -1;
+	}
+
+	time(&time_server);
+
+	switch (duration_type)
+	{
+		case 'm':
+			time_server += (duration * 60);
+		break;
+
+		case 'h':
+			time_server += (duration * 3600);
+		break;
+
+		case 'd':
+			time_server += (duration * 86400);
+		break;
+
+		default:
+			duration = 0;
+		break;
+	}
+
+	if (duration == 0)
+	{
+		clif_displaymessage(fd, command_info);
+		return -1;
+	}
+
+	strftime(unban_time_str, sizeof(unban_time_str), "%Y-%m-%d %H:%M:%S", localtime(&time_server)); 
+
+	sprintf(atcmd_output, "Request: block by unqiue ID: %u", violator_unique_id);
+	clif_displaymessage(fd, atcmd_output);
+
+	chrif_gepard_req_block(violator_unique_id, NULL, 0, sd->status.name, sd->status.account_id, unban_time_str, reason_str);
+
+	return 0;
+}
+
+ACMD_FUNC(gepard_unblock_nick)
+{
+	char violator_name[NAME_LENGTH];
+	const char* command_info = "Wrong input (usage: @gepard_unblock_nick <char name>)";
+
+	nullpo_retr(-1, sd);
+
+	if (!*message || sscanf(message, "\"%23[^\"]\"[^\n]", violator_name) < 1)
+	{
+		clif_displaymessage(fd, command_info);
+		return -1;
+	}
+
+	sprintf(atcmd_output, "Request: unblock by name - %s", violator_name);
+
+	clif_displaymessage(fd, atcmd_output);
+
+	chrif_gepard_req_unblock(0, violator_name, 0, sd->status.account_id);
+
+	return 0;
+}
+
+ACMD_FUNC(gepard_unblock_account_id)
+{
+	int violator_aid;
+	const char* command_info = "Wrong input (usage: @gepard_unblock_account_id <account ID>)";
+
+	nullpo_retr(-1, sd);
+
+	memset(atcmd_player_name, '\0', sizeof(atcmd_player_name));
+
+	if (!*message || sscanf(message, "%d", &violator_aid) < 1)
+	{
+		clif_displaymessage(fd, command_info);
+		return -1;
+	}
+
+	sprintf(atcmd_output, "Request: unblock by account id - %d", violator_aid);
+
+	clif_displaymessage(fd, atcmd_output);
+
+	chrif_gepard_req_unblock(0, NULL, violator_aid, sd->status.account_id);
+
+	return 0;
+}
+
+ACMD_FUNC(gepard_unblock_unique_id)
+{
+	unsigned int violator_unique_id;
+	const char* command_info = "Wrong input (usage: @gepard_unblock_unique_id <unique ID>)";
+
+	nullpo_retr(-1, sd);
+
+	if (!*message || sscanf(message, "%u", &violator_unique_id) < 1)
+	{
+		clif_displaymessage(fd, command_info);
+		return -1;
+	}
+
+	sprintf(atcmd_output, "Request: unblock by unique id - %u", violator_unique_id);
+
+	clif_displaymessage(fd, atcmd_output);
+
+	chrif_gepard_req_unblock(violator_unique_id, NULL, 0, sd->status.account_id);
+
+	return 0;
+}
+
+// (^~_~^) Gepard Shield End
 
 #include "../custom/atcommand.inc"
 
@@ -11903,6 +11970,18 @@ void atcommand_basecommands(void) {
 	 * TODO: List all commands that causing crash
 	 **/
 	AtCommandInfo atcommand_base[] = {
+
+// (^~_~^) Gepard Shield Start
+
+		ACMD_DEF(gepard_block_nick),
+		ACMD_DEF(gepard_block_account_id),
+		ACMD_DEF(gepard_block_unique_id),
+		ACMD_DEF(gepard_unblock_nick),
+		ACMD_DEF(gepard_unblock_account_id),
+		ACMD_DEF(gepard_unblock_unique_id),
+
+// (^~_~^) Gepard Shield End
+
 #include "../custom/atcommand_def.inc"
 		ACMD_DEF2R("warp", mapmove, ATCMD_NOCONSOLE),
 		ACMD_DEF(where),
@@ -12231,14 +12310,6 @@ void atcommand_basecommands(void) {
 		ACMD_DEF(reloadauradb),
 		ACMD_DEF(autorefresh),
 		ACMD_DEF(battleinfo),
-		ACMD_DEF(afk),
-		ACMD_DEF(restock),
-		ACMD_DEF(wrestock),
-		ACMD_DEF(reloadrestock),
-		ACMD_DEF(autovend),
-		ACMD_DEF2("av", autovend),
-		ACMD_DEF(hideview),
-		ACMD_DEF2("showview", hideview),
 	};
 	AtCommandInfo* atcommand;
 	int i;

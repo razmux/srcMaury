@@ -188,6 +188,8 @@ struct CharServ_Config {
 	int mail_return_days;
 	int mail_delete_days;
 
+	int bg_regular_rewards[3];
+
 	int allowed_job_flag;
 };
 extern struct CharServ_Config charserv_config;

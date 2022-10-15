@@ -163,7 +163,6 @@ struct s_mob_lootitem {
 struct s_mob_drop {
 	unsigned short nameid;
 	int p;
-	int base_p;
 	uint8 randomopt_group;
 	unsigned steal_protected : 1;
 };

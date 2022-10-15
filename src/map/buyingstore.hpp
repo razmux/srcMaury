@@ -54,10 +54,6 @@ struct s_autotrader {
 	uint16 count; ///< Number of item in store
 	struct s_autotrade_entry **entries; ///< Store details
 	struct map_session_data *sd;
-
-	/// Autovend
-	struct s_autotrader *next_autovend_at = NULL;
-	int autotrade; /// Autotrade type
 };
 
 int8 buyingstore_setup(struct map_session_data* sd, unsigned char slots);

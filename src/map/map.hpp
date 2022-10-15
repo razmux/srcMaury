@@ -51,7 +51,7 @@ void map_msg_reload(void);
 #define NATURAL_HEAL_INTERVAL 500
 #define MIN_FLOORITEM 2
 #define MAX_FLOORITEM START_ACCOUNT_NUM
-#define MAX_LEVEL 175
+#define MAX_LEVEL 99
 #define MAX_DROP_PER_MAP 48
 #define MAX_IGNORE_LIST 20 	// official is 14
 #define MAX_VENDING 12
@@ -589,17 +589,12 @@ enum e_mapflag : int16 {
 	MF_PRIVATEAIRSHIP_SOURCE,
 	MF_PRIVATEAIRSHIP_DESTINATION,
 	MF_SKILL_DURATION,
-	MF_DROPRATE50,
-	MF_DROPRATE300,
 	MF_NOECALL, // [BattleGround System] [Easycore]
 	MF_BG_CONSUME, // allows using BG consumables [Easycore]
 	MF_WOE_CONSUME, // allows using WoE consumables [Easycore]
 	MF_BG_TOPSCORE,
 	MF_NOPVPMODE, //PvPMode eAmod
 	MF_NOGUILDWAR, //PvPMode eAmod
-	MF_GUILD_MIN,		// Oboro
-	MF_GUILD_MAX,		// Oboro
-	MF_MAP_DISABLED,	// Oboro
 	MF_MAX
 };
 
@@ -754,7 +749,6 @@ struct map_data {
 	struct npc_data *npc[MAX_NPC_PER_MAP];
 	struct spawn_data *moblist[MAX_MOB_LIST_PER_MAP]; // [Wizputer]
 	int mob_delete_timer;	// Timer ID for map_removemobs_timer [Skotlex]
-	int guild_max; // Oboro
 
 	// Instance Variables
 	unsigned short instance_id;
@@ -952,7 +946,7 @@ inline bool mapdata_bg_items(struct map_data *mapdata) {
 	if (mapdata == nullptr)
 		return false;
 
-	if (mapdata->flag[MF_BATTLEGROUND] ||  mapdata->flag[MF_BG_CONSUME])
+	if (mapdata->flag[MF_BATTLEGROUND] || mapdata->flag[MF_BG_CONSUME])
 		return true;
 
 	return false;
@@ -1146,7 +1140,6 @@ int map_count_oncell(int16 m,int16 x,int16 y,int type,int flag);
 struct skill_unit *map_find_skill_unit_oncell(struct block_list *,int16 x,int16 y,uint16 skill_id,struct skill_unit *, int flag);
 // search and creation
 int map_get_new_object_id(void);
-int map_get_new_bl_id(void);
 int map_search_freecell(struct block_list *src, int16 m, int16 *x, int16 *y, int16 rx, int16 ry, int flag);
 bool map_closest_freecell(int16 m, int16 *x, int16 *y, int type, int flag);
 //
@@ -1321,7 +1314,6 @@ extern char vending_items_table[32];
 extern char market_table[32];
 extern char roulette_table[32];
 extern char guild_storage_log_table[32];
-extern char char_table[32]; // Autovend char table
 
 void do_shutdown(void);
 

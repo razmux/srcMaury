@@ -366,34 +366,34 @@ int pc_class2idx(int class_) {
 	return class_;
 }
 
+bool pc_isPremium(struct map_session_data *sd)
+{
+	return ( battle_config.premium_group_id && sd->Premium_Tick > (int)time(NULL) );
+}
 
 static TIMER_FUNC(pc_Premium_end)
 {
-	struct map_session_data *sd = map_id2sd(id);
+	struct map_session_data *sd;
 	int this_tick;
+	sd = map_id2sd(id);
 
-	if( sd == NULL )
+	if(!sd)
 		return 0;
-	if( tid != sd->Premium_timer )
-	{
-		ShowError("pc_Premium_end: invalid timer id.\n");
-		return 0;
-	}
 
 	this_tick = sd->Premium_Tick - (int)time(NULL);
 	if( this_tick > 0 )
 	{ // Reannounce and continue
-		int day, hour, minute, second;
+		int day, hour, minute, second, next_tick;
 		char output[256];
 
+		next_tick = gettick() + (min(this_tick,3600) * 1000);
 		atcommand_expinfo_sub(this_tick, &day, &hour, &minute, &second);
 		sprintf(output, "La cuenta premium vence en : %d dias, %02d horas, %02d minutos, %02d segundos", day, hour, minute, second);
-		clif_messagecolor(&sd->bl, color_table[COLOR_LIGHT_GREEN], output, false, SELF);
+			clif_messagecolor(&sd->bl, color_table[COLOR_LIGHT_GREEN], output, false, SELF);
 
-		sd->Premium_timer =  add_timer(gettick() + battle_config.premium_announce_delay * 60000, pc_Premium_end, sd->bl.id, 0);
+		sd->Premium_timer = add_timer(next_tick, pc_Premium_end, sd->bl.id, 0);
 		return 1;
 	}
-
 	// Return to previous group
 	sd->group_id = sd->Premium_basegroup_id;
 	pc_group_pc_load(sd);
@@ -402,16 +402,9 @@ static TIMER_FUNC(pc_Premium_end)
 	return 1;
 }
 
-bool pc_isPremium(struct map_session_data *sd)
-{
-		return ( battle_config.premium_group_id && sd->Premium_Tick > (int)time(NULL) );
-}
-
-
 void pc_Premium_validate(struct map_session_data *sd)
 {
 	int tick = sd->Premium_Tick - (int)time(NULL), gm_lvl = pc_get_group_level(sd);
-
 	if( tick > 0 )
 	{
 		if( sd->Premium_timer != INVALID_TIMER )
@@ -423,16 +416,17 @@ void pc_Premium_validate(struct map_session_data *sd)
 			pc_group_pc_load(sd);
 		}
 
-		if (gm_lvl >= battle_config.premium_gm && battle_config.premium_group_id)
-		{
-			sd->group_id = sd->Premium_basegroup_id;
-			pc_group_pc_load(sd);
-		}
+		sd->Premium_timer = add_timer(gettick() + min(((tick + 5) * 1000),3600000), pc_Premium_end, sd->bl.id, 0);
+	}
 
-		sd->Premium_timer =  add_timer(gettick() + battle_config.premium_announce_delay * 60000, pc_Premium_end, sd->bl.id, 0);
+	if (gm_lvl >= battle_config.premium_gm && battle_config.premium_group_id)
+	{
+		sd->group_id = sd->Premium_basegroup_id;
+		pc_group_pc_load(sd);
 	}
 	else
 	{
+
 		if( sd->Premium_timer != INVALID_TIMER )
 		{
 			delete_timer(sd->Premium_timer, pc_Premium_end);
@@ -445,7 +439,6 @@ void pc_Premium_validate(struct map_session_data *sd)
 
 	return;
 }
-
 
 void pc_calc_playtime(struct map_session_data* sd)
 {
@@ -643,17 +636,15 @@ void pc_addfame(struct map_session_data *sd,int count,short flag)
 		sd->status.pk.score += count;
 		if( sd->status.pk.score > MAX_FAME )
 			sd->status.pk.score = MAX_FAME;
-
 		clif_rank_info(sd,count,sd->status.pk.score,1);
 		chrif_updatefamelist(sd,1);
 		return;
 
-	case 2: // Bg Rank
+	case 2: // Bg Normal Matchs
 		clif_specialeffect(&sd->bl, EF_ENHANCE, SELF);
 		sd->status.bgstats.points += count;
 		if( sd->status.bgstats.points > MAX_FAME )
 			sd->status.bgstats.points = MAX_FAME;
-
 		clif_rank_info(sd,count,sd->status.bgstats.points,2);
 		chrif_updatefamelist(sd,2);
 		return;
@@ -662,7 +653,6 @@ void pc_addfame(struct map_session_data *sd,int count,short flag)
 		sd->status.wstats.points += count;
 		if( sd->status.wstats.points > MAX_FAME )
 			sd->status.wstats.points = MAX_FAME;
-
 		clif_rank_info(sd,count,sd->status.wstats.points,3);
 		chrif_updatefamelist(sd,3);
 		return;
@@ -1534,22 +1524,6 @@ bool pc_authok(struct map_session_data *sd, uint32 login_id2, time_t expiration_
 		return false;
 	}
 
-	// Find Autovend
-	struct map_session_data* pl_sd;
-	struct s_mapiterator* iter;
-	iter = mapit_getallusers();
-	for (pl_sd = (TBL_PC*)mapit_first(iter); mapit_exists(iter); pl_sd = (TBL_PC*)mapit_next(iter))
-	{
-		if (sd->status.account_id == pl_sd->autovend.account_id && sd->status.char_id == pl_sd->status.char_id)
-		{
-			vending_closevending(pl_sd);
-			unit_remove_map_pc(pl_sd, CLR_OUTSIGHT);
-			unit_free_pc(pl_sd);
-			ShowInfo("Autovend '" CL_WHITE "%d" CL_RESET "' kicked.\n", sd->status.char_id);
-		}
-	}
-	mapit_free(iter);
-
 	//Set the map-server used job id. [Skotlex]
 	i = pc_jobid2mapid(sd->status.class_);
 	if (i == -1) { //Invalid class?
@@ -1807,6 +1781,15 @@ void pc_reg_received(struct map_session_data *sd)
 	if (msg_checklangtype(sd->langtype,true) < 0)
 		sd->langtype = 0; //invalid langtype reset to default
 
+// (^~_~^) LGP Start
+
+	if (is_gepard_active == true)
+	{
+		clif_gepard_send_lgp_settings(sd);
+	}
+
+// (^~_~^) LGP End
+
 	// Cash shop
 	sd->cashPoints = pc_readaccountreg(sd, add_str(CASHPOINT_VAR));
 	sd->kafraPoints = pc_readaccountreg(sd, add_str(KAFRAPOINT_VAR));
@@ -1947,9 +1930,7 @@ void pc_reg_received(struct map_session_data *sd)
 		sd->group_id = sd->Premium_basegroup_id;
 		pc_group_pc_load(sd);
 	}
-
-		delete_timer(sd->Premium_timer, pc_Premium_end);
-		sd->Premium_timer =  add_timer(gettick() + battle_config.premium_announce_delay * 60000, pc_Premium_end, sd->bl.id, 0);
+		sd->Premium_timer = add_timer(gettick() + min(((tick + 5) * 1000),3600000), pc_Premium_end, sd->bl.id, 0);
 
 		atcommand_expinfo_sub(tick, &day, &hour, &minute, &second);
 		sprintf(output, "La cuenta premium vence en : %d dias, %02d horas, %02d minutos, %02d segundos", day, hour, minute, second);
@@ -5250,10 +5231,6 @@ char pc_delitem(struct map_session_data *sd,int n,int amount,int type, short rea
 	if(n < 0 || sd->inventory.u.items_inventory[n].nameid == 0 || amount <= 0 || sd->inventory.u.items_inventory[n].amount<amount || sd->inventory_data[n] == NULL)
 		return 1;
 
-	//RESTOCKSTART
-	if ( log_type != LOG_TYPE_STORAGE )
-		INIT_EVENT_RESTOCK(sd,sd->inventory.u.items_inventory[n].nameid,sd->inventory.u.items_inventory[n].amount);
-
 	log_pick_pc(sd, log_type, -amount, &sd->inventory.u.items_inventory[n]);
 
 	sd->inventory.u.items_inventory[n].amount -= amount;
@@ -6087,10 +6064,10 @@ int pc_getitem_map(struct map_session_data *sd,struct item it,int amt,int count,
  *------------------------------------------*/
 enum e_setpos pc_setpos(struct map_session_data* sd, unsigned short mapindex, int x, int y, clr_type clrtype)
 {
+	int16 m; 
+	int house_number;
+	char concatHouse[40], output[CHAT_SIZE_MAX];
 
-	int i, c, numCasa;
-	char output[CHAT_SIZE_MAX], concatHouse[40], concatHouseMB[40];
-	struct guild *g;
 	nullpo_retr(SETPOS_OK,sd);
 
 	if( !mapindex || !mapindex_id2name(mapindex) ) {
@@ -6106,99 +6083,32 @@ enum e_setpos pc_setpos(struct map_session_data* sd, unsigned short mapindex, in
 		pc_setrestartvalue(sd,1);
 	}
 
-	int16 m = map_mapindex2mapid(mapindex);
+	m = map_mapindex2mapid(mapindex);
 	struct map_data *mapdata = map_getmapdata(m);
- 	status_change *sc = status_get_sc(&sd->bl);
 
-	/*
-		Oboro MIX & MAX GUILD MIN WOE
-	 */
-	if (pc_get_group_level(sd) < 60 && agit2_flag )
+	// - [Oboro] House System
+	if (strncmp(map[m].name, "gr_", 3) == 0 && pc_get_group_level(sd) < 60 ) 
 	{
-		if (mapdata->flag[MF_GUILD_MIN])
+		sscanf(map[m].name, "%*[^_]_%d", &house_number);
+		sprintf(concatHouse,"$GROOM%d",house_number);
+		if ( !sd->status.guild_id || sd->status.guild_id != mapreg_readreg(add_str(concatHouse))) 
 		{
-			if (!sd->status.guild_id || (sd->status.guild_id && (g = guild_search(sd->status.guild_id)) == NULL))
-			{
-				mapindex = sd->status.save_point.map;
-				x = sd->status.save_point.x;
-				y = sd->status.save_point.y;
-				m = map_mapindex2mapid(mapindex);
-				clif_displaymessage(sd->fd, "[WOE]: No puedes entrar sin guild al castillo");
-			}
-			else if (sd->bl.m != m && sd->status.guild_id && (g = guild_search(sd->status.guild_id)) != NULL)
-			{
-				for (i = c = 0; i < g->max_member; i++)
-					if (g->member[i].sd)
-						c++;
-
-				if (c < battle_config.min_guild)
-				{
-					sprintf(output, "[WOE]: Tu Guild debe tener al menos %d miembros para entrar a WOE", battle_config.min_guild);
-					clif_displaymessage(sd->fd, output);
-					mapindex = sd->status.save_point.map;
-					x = sd->status.save_point.x;
-					y = sd->status.save_point.y;
-					m = map_mapindex2mapid(mapindex);
-				}
-			}
-		}
-
-		if (mapdata->flag[MF_GUILD_MAX] && sd->bl.m != m && sd->status.guild_id && (g = guild_search(sd->status.guild_id)) != NULL)
-		{
-			for (i = c = 0; i < g->max_member && c < mapdata->guild_max; i++)
-				if (g->member[i].sd && g->member[i].sd->bl.m == m)
-					c++;
-
-			if (c >= battle_config.max_guild)
-			{ // No more guild members on this map
-				mapindex = sd->status.save_point.map;
-				x = sd->status.save_point.x;
-				y = sd->status.save_point.y;
-				m = map_mapindex2mapid(mapindex);
-				sprintf(output, "[WOE]: The max cap. of guild in WOE castle is: %d", battle_config.max_guild);
-				clif_displaymessage(sd->fd, output);
-			}
-		}
-	}
-
-	if (strncmp(mapdata->name, "gr_", 3) == 0 && pc_get_group_level(sd) < 60) {
-		sscanf(mapdata->name, "%*[^_]_%d", &numCasa);
-		sprintf(concatHouse, "$GROOM%d", numCasa);
-		sprintf(concatHouseMB, "$GROOMB%d", numCasa);
-		if (!sd->status.guild_id || (
-			sd->status.guild_id != mapreg_readreg(add_str(concatHouse)) &&
-			sd->status.guild_id != mapreg_readreg(add_str(concatHouseMB))
-
-			)) {
-			clif_displaymessage(sd->fd, "[Guild Room]: Ya no puedes entrar a eta Guild House.");
-			x = 99;
-			y = 81;
-			mapindex = mapdata->index;
-			pc_setsavepoint(sd, mapindex_name2id(MAP_PRONTERA), 156,  180);
-			pc_setpos(sd, mapindex_name2id(MAP_PRONTERA), 156,  180, CLR_TELEPORT);
-			return SETPOS_OK;
-
-		}
-	}
-
-	// Oboro - disabled map
-	if (mapdata->flag[MF_MAP_DISABLED]) {
-		if (pc_get_group_level(sd) > 9) {
-			clif_displaymessage(sd->fd, "[Disabled]: El mapa esta deshabilitado por un mapflag, pero los GM's pueden ingresar");
-		}
-		else {
+			clif_displaymessage(sd->fd, "[House System]: No tienes permitido entrar en esta casa.");
+			pc_setsavepoint(sd, mapindex_name2id(MAP_PRONTERA), 155, 187);
 			mapindex = sd->status.save_point.map;
 			x = sd->status.save_point.x;
 			y = sd->status.save_point.y;
 			m = map_mapindex2mapid(mapindex);
-			clif_displaymessage(sd->fd, "[Disabled]: El mapa esta deshabilitado por un mapflag. ");
 		}
 	}
+
 
 	sd->state.changemap = (sd->mapindex != mapindex);
 	sd->state.warping = 1;
 	sd->state.workinprogress = WIP_DISABLE_NONE;
 	sd->ud.state.blockedskill = 0;
+
+
 
 	if( sd->state.changemap ) { // Misc map-changing settings
 		unsigned short curr_map_instance_id = map_getmapdata(sd->bl.m)->instance_id, new_map_instance_id = (mapdata ? mapdata->instance_id : 0);
@@ -10014,7 +9924,6 @@ void pc_changelook(struct map_session_data *sd,int type,int val) {
 		break;
 	}
 	clif_changelook(&sd->bl, type, val);
-	map_foreachinallrange(clif_hideview, &sd->bl, AREA_SIZE, BL_PC, &sd->bl);
 }
 
 /*==========================================
@@ -10222,14 +10131,6 @@ bool pc_candrop(struct map_session_data *sd, struct item *item)
 		return false;
 	if( !pc_can_give_items(sd) || sd->sc.cant.drop) //check if this GM level can drop items
 		return false;
-	if( item->card[0] == CARD0_CREATE) {
-		if (MakeDWord(item->card[2], item->card[3]) == battle_config.bg_reserved_char_id && battle_config.reserved_can_trade)
-			return false;
-		if (MakeDWord(item->card[2], item->card[3]) == battle_config.woe_reserved_char_id && battle_config.reserved_can_trade)
-			return false;
-		if (MakeDWord(item->card[2], item->card[3]) == battle_config.universal_reserved_char_id && battle_config.reserved_can_trade)
-			return false;
-	}
 	return (itemdb_isdropable(item, pc_get_group_level(sd)));
 }
 
@@ -13934,7 +13835,7 @@ bool pc_job_can_entermap(enum e_job jobid, int m, int group_lv) {
  * @param sd
  **/
 void pc_set_costume_view(struct map_session_data *sd) {
-	int i = -1, head_low = 0, head_mid = 0, head_top = 0, robe = 0, weapon = 0;
+	int i = -1, head_low = 0, head_mid = 0, head_top = 0, robe = 0;
 	struct item_data *id = NULL;
 
 	nullpo_retv(sd);
@@ -13943,10 +13844,8 @@ void pc_set_costume_view(struct map_session_data *sd) {
 	head_mid = sd->status.head_mid;
 	head_top = sd->status.head_top;
 	robe = sd->status.robe;
-	weapon = sd->status.weapon;
 
-	sd->status.head_bottom = sd->status.head_mid = sd->status.head_top = sd->status.robe = sd->status.weapon = 0;
-
+	sd->status.head_bottom = sd->status.head_mid = sd->status.head_top = sd->status.robe = 0;
 
 	//Added check to prevent sending the same look on multiple slots ->
 	//causes client to redraw item on top of itself. (suggested by Lupus)
@@ -13967,8 +13866,6 @@ void pc_set_costume_view(struct map_session_data *sd) {
 		sd->status.head_top = id->look;
 	if ((i = sd->equip_index[EQI_GARMENT]) != -1 && (id = sd->inventory_data[i]))
 		sd->status.robe = id->look;
-	if ((i = sd->equip_index[EQI_HAND_R]) != -1 && (id = sd->inventory_data[i]))
-		sd->status.weapon = id->look;	
 
 	// Costumes check
 	if (!map_getmapflag(sd->bl.m, MF_NOCOSTUME)) {
@@ -13988,8 +13885,6 @@ void pc_set_costume_view(struct map_session_data *sd) {
 			sd->status.head_top = id->look;
 		if ((i = sd->equip_index[EQI_COSTUME_GARMENT]) != -1 && (id = sd->inventory_data[i]))
 			sd->status.robe = id->look;
-		if ((i = sd->equip_index[EQI_SHADOW_WEAPON]) != -1 && (id = sd->inventory_data[i]))
-			sd->status.weapon = id->look;
 	}
 
 	if (sd->setlook_head_bottom)
@@ -14001,7 +13896,6 @@ void pc_set_costume_view(struct map_session_data *sd) {
 	if (sd->setlook_robe)
 		sd->status.robe = sd->setlook_robe;
 
-
 	if (head_low != sd->status.head_bottom)
 		clif_changelook(&sd->bl, LOOK_HEAD_BOTTOM, sd->status.head_bottom);
 	if (head_mid != sd->status.head_mid)
@@ -14010,9 +13904,6 @@ void pc_set_costume_view(struct map_session_data *sd) {
 		clif_changelook(&sd->bl, LOOK_HEAD_TOP, sd->status.head_top);
 	if (robe != sd->status.robe)
 		clif_changelook(&sd->bl, LOOK_ROBE, sd->status.robe);
-	if (weapon != sd->status.weapon)
-		clif_changelook(&sd->bl, LOOK_WEAPON, sd->status.weapon);		
-		map_foreachinallrange(clif_hideview, &sd->bl, AREA_SIZE, BL_PC, &sd->bl);
 }
 
 /***********************************************************
@@ -14222,14 +14113,16 @@ void pc_record_mobkills(struct map_session_data *sd, struct mob_data *md)
 			pc_addfame(sd,30,2);
 			break;
 		case 1911:
-			add2limit(sd->status.bgstats.boss_flags, 1, USHRT_MAX);
+			if (!strcmpi(map[sd->bl.m].name,"bat_a03") ) {
+				add2limit(sd->status.bgstats.boss_flags, 1, USHRT_MAX);
 			pc_addfame(sd,5,2);
-			
+			}
 			break;
 		case 1906:
-			add2limit(sd->status.bgstats.barricade_kill, 1, USHRT_MAX);
+			if (strcmpi(map[sd->bl.m].name,"bat_a01")) {
+				add2limit(sd->status.bgstats.barricade_kill, 1, USHRT_MAX);
 			pc_addfame(sd,1,2);
-			
+			}
 			break;
 
 		}
@@ -14310,7 +14203,6 @@ void pc_record_damage(struct block_list *src, struct block_list *target, int dam
 						add2limit(sd->status.wstats.emperium_damage, damage, UINT_MAX);
 						break;
 					case 1905:
-					case 1906:
 						add2limit(sd->status.wstats.barricade_damage, damage, UINT_MAX);
 						break;
 					case MOBID_GUARDIAN_STONE1:
@@ -14329,7 +14221,7 @@ void pc_record_damage(struct block_list *src, struct block_list *target, int dam
 
 void pc_rank_reward(int position, int type)
 {
-	if (position > 3)
+	if (position > MAX_FAME_LIST)
 		return;
 	
 	struct mail_message msg;
@@ -14340,7 +14232,7 @@ void pc_rank_reward(int position, int type)
 	if (RANK_BG) {
 		safestrncpy(msg.dest_name,bg_fame_list[position].name, NAME_LENGTH);
 		safesnprintf( msg.title, MAIL_TITLE_LENGTH, "BG Rank Rewards");
-		safesnprintf( msg.body, MAIL_BODY_LENGTH, "Has sido recompensado por tu rango #%d en Battleground", position+1 );
+		safesnprintf( msg.body, MAIL_BODY_LENGTH, "You have been rewarded by your Rank #%d in Battleground", position+1 );
 
 		msg.item[0].nameid = bgr[position].nameid;
 		msg.item[0].amount = bgr[position].amount;
@@ -14350,7 +14242,7 @@ void pc_rank_reward(int position, int type)
 	else if (RANK_WOE) {
 		safestrncpy(msg.dest_name,woe_fame_list[position].name, NAME_LENGTH);
 		safesnprintf( msg.title, MAIL_TITLE_LENGTH, "WoE Rank Rewards");
-		safesnprintf( msg.body, MAIL_BODY_LENGTH, "Has sido recompensado por tu rango #%d en War of Emperium", position+1 );
+		safesnprintf( msg.body, MAIL_BODY_LENGTH, "You have been rewarded by your Rank #%d in War of Emperium", position+1 );
 
 		msg.item[0].nameid = woer[position].nameid;
 		msg.item[0].amount = woer[position].amount;
@@ -14366,9 +14258,6 @@ void pc_rank_reward(int position, int type)
 	intif_Mail_send(0, &msg);
 }
 
-/*==========================================
-	Ranking Reset
- *------------------------------------------*/
 void pc_rank_reset(int type, bool reward)
 {
 	struct map_session_data *sd = NULL;
@@ -14420,30 +14309,18 @@ void pc_rank_reset(int type, bool reward)
 	mapit_free(iter);
 
 	switch(type) {
-		case RANK_PVP:
-		if( SQL_ERROR == Sql_Query(mmysql_handle, "TRUNCATE TABLE `char_pvp`") )
-			Sql_ShowDebug(mmysql_handle);
-			break;
 		case RANK_BG:
-			if( SQL_ERROR == Sql_Query(mmysql_handle, "TRUNCATE TABLE `char_bg`") )
-				Sql_ShowDebug(mmysql_handle); // Data Cleanup
-			if( SQL_ERROR == Sql_Query(mmysql_handle, "TRUNCATE TABLE `char_bg_log`") )
-				Sql_ShowDebug(mmysql_handle); // Kill log cleanup
-				memset(bg_fame_list, 0, sizeof(bg_fame_list)); // Reset BGRank
+			if( SQL_ERROR == Sql_Query(mmysql_handle, "UPDATE `char_bg` SET `points` = '0'") )
+				Sql_ShowDebug(mmysql_handle);
 			break;
 		case RANK_WOE:
-			if( SQL_ERROR == Sql_Query(mmysql_handle, "TRUNCATE TABLE `char_wstats`") )
-				Sql_ShowDebug(mmysql_handle);
-			if( SQL_ERROR == Sql_Query(mmysql_handle, "TRUNCATE TABLE `char_woe_log`") )
-				Sql_ShowDebug(mmysql_handle); // Kill log cleanup
-			if( SQL_ERROR == Sql_Query(mmysql_handle, "TRUNCATE TABLE `skill_count`") )
+			if( SQL_ERROR == Sql_Query(mmysql_handle, "UPDATE `char_wstats` SET `points` = '0'") )
 				Sql_ShowDebug(mmysql_handle);
 			break;
 	}
 
 	chrif_buildfamelist();
 }
-
 
 void pc_battle_stats(struct map_session_data *sd, struct map_session_data *tsd, int flag)
 {
@@ -14454,7 +14331,7 @@ void pc_battle_stats(struct map_session_data *sd, struct map_session_data *tsd, 
 	// Battleground Stats
 	if (flag == 1) {
 		if (sd != tsd && tsd->status.bgstats.showstats) {
-			clif_displaymessage(sd->fd, "El jugador no permite mostrar esta información.");
+			clif_displaymessage(sd->fd, "Player doesn not allow to show this information");
 			return;
 		}
 		clif_messagecolor(&sd->bl, color_table[COLOR_LIGHT_GREEN], "============ BATTLEGROUND STATS ============", false, SELF);
@@ -14564,17 +14441,18 @@ void pc_battle_stats(struct map_session_data *sd, struct map_session_data *tsd, 
 	// War of Emperium Stats
 	} else {
 		if (sd != tsd && tsd->status.wstats.showstats) {
-			clif_displaymessage(sd->fd, "El jugador no permite mostrar esta información.");
+			clif_displaymessage(sd->fd, "Player doesn not allow to show this information");
 			return;
 		}
 		clif_messagecolor(&sd->bl, color_table[COLOR_CYAN], "============ WAR OF EMPERIUM STATS ============", false, SELF);
 		sprintf(output, "    Name: %s (%s)", tsd->status.name,job_name(tsd->status.class_));
 		clif_messagecolor(&sd->bl, color_table[COLOR_CYAN], output, false, SELF);
 		if (pc_famerank(tsd->status.char_id,-2))
-			sprintf(output, "    Rank: %d    -    Points: %d", pc_famerank(tsd->status.char_id,-2),tsd->status.wstats.points);
+			sprintf(output, "    Rank: %d    -    Points: %d", pc_famerank(tsd->status.char_id,-2),tsd->status.bgstats.points);
 		else
-			sprintf(output, "    Rank: N/A    -    Points: %d",tsd->status.wstats.points);
+			sprintf(output, "    Rank: N/A    -    Points: %d",tsd->status.bgstats.points);
 		clif_messagecolor(&sd->bl, color_table[COLOR_CYAN], output, false, SELF);
+		sprintf(output, "    Wins: %d    -    Lost: %d    -    Draw: %d",tsd->status.bgstats.win,tsd->status.bgstats.lost,tsd->status.bgstats.tie);
 		sprintf(output, "    Kills: %d    -    Deaths: %d", tsd->status.wstats.kill_count, tsd->status.wstats.death_count);
 		clif_messagecolor(&sd->bl, color_table[COLOR_CYAN], output, false, SELF);
 		sprintf(output, "    Damage dealt: %d    -    Top damage: %d", tsd->status.wstats.damage_done,tsd->status.wstats.top_damage);

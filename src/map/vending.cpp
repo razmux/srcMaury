@@ -15,11 +15,10 @@
 #include "achievement.hpp"
 #include "atcommand.hpp"
 #include "battle.hpp"
-#include "channel.hpp"
+#include "buyingstore.hpp"
 #include "buyingstore.hpp" // struct s_autotrade_entry, struct s_autotrader
 #include "chrif.hpp"
 #include "clif.hpp"
-#include "guild.hpp"
 #include "intif.hpp"
 #include "itemdb.hpp"
 #include "log.hpp"
@@ -70,10 +69,6 @@ void vending_closevending(struct map_session_data* sd)
 
 		sd->state.vending = false;
 		sd->vender_id = 0;
-		if( sd->autovend.account_id ) {
-			sd->autovend.account_id = 0;
-			sd->autovend.active = true;
-		}
 		clif_closevendingboard(&sd->bl, 0);
 		idb_remove(vending_db, sd->status.char_id);
 	}
@@ -109,11 +104,6 @@ void vending_vendinglistreq(struct map_session_data* sd, int id)
 			clif_broadcast(&sd->bl, output, (int)strlen(output) + 1, 0x10, SELF);
 		else
 			clif_messagecolor(&sd->bl, color_table[COLOR_CYAN], output, false, SELF);
-	}
-
-	if (vsd->autovend.account_id == sd->status.account_id && !battle_config.open_autovend_same_account) {
-		clif_displaymessage(sd->fd, msg_txt(sd, 805)); // you're not allowed to see your own shops
-		return;
 	}
 
 	sd->vended_id = vsd->vender_id;  // register vending uid
@@ -152,11 +142,6 @@ void vending_purchasereq(struct map_session_data* sd, int aid, int uid, const ui
 	double z;
 	struct s_vending vending[MAX_VENDING]; // against duplicate packets
 	struct map_session_data* vsd = map_id2sd(aid);
-
-	// [CreativeSD]: Autovend
-	struct mail_message msg;
-	char mailBody[1000];
-	double total = 0;
 
 	nullpo_retv(sd);
 	if( vsd == NULL || !vsd->state.vending || vsd->bl.id == sd->bl.id )
@@ -309,8 +294,6 @@ void vending_purchasereq(struct map_session_data* sd, int aid, int uid, const ui
 			achievement_update_objective(sd, AG_SPEND_ZENY, 1, (int)z);
 			z = vending_calc_tax(sd, z);
 			pc_getzeny(vsd, (int)z, LOG_TYPE_VENDING, sd);
-
-
 		}
 		else if (vsd->vend_loot == ITEMID_CASH) {
 			pc_paycash(sd, (int)z, 0, LOG_TYPE_VENDING);
@@ -330,14 +313,8 @@ void vending_purchasereq(struct map_session_data* sd, int aid, int uid, const ui
 	else {
 		pc_payzeny(sd, (int)z, LOG_TYPE_VENDING, vsd);
 		achievement_update_objective(sd, AG_SPEND_ZENY, 1, (int)z);
-		total = z = vending_calc_tax(sd, z);
+		z = vending_calc_tax(sd, z);
 		pc_getzeny(vsd, (int)z, LOG_TYPE_VENDING, sd);
-		// Autovend Message
-		memset(&msg, 0, sizeof(struct mail_message));
-		msg.dest_id = vsd->status.char_id;
-		safestrncpy(msg.send_name, "Server", NAME_LENGTH);
-		safestrncpy(msg.title, msg_txt(vsd,811), MAIL_TITLE_LENGTH);
-
 	}
 	int mailprofit = 0;
 
@@ -362,26 +339,6 @@ void vending_purchasereq(struct map_session_data* sd, int aid, int uid, const ui
 		} else {
 			if( Sql_Query( mmysql_handle, "DELETE FROM `%s` WHERE `vending_id` = %d and `cartinventory_id` = %d", vending_items_table, vsd->vender_id, vsd->cart.u.items_cart[idx].id ) != SQL_SUCCESS ) {
 				Sql_ShowDebug( mmysql_handle );
-			}
-		}
-
-		// [CreativeSD]: Autovend
-		if( vsd->autovend.account_id ) {
-			struct item_data *i_data = itemdb_exists(vsd->cart.u.items_cart[idx].nameid);
-			if( i_data != NULL  ) {
-				if( i == 0 ) {
-					sprintf(mailBody, msg_txt(sd,812), sd->status.name);
-					sprintf(mailBody, "%s\r\n\r\n", mailBody);
-				}
-#if PACKETVER >= 20150513 // Old mail box is too shorter
-				if( i >= 0 && strlen(mailBody) < 180 ) {
-					//sprintf(mailBody + strlen(mailBody), msg_txt(vsd,813), amount, i_data->ename.c_str(), (int)z);
-					sprintf(mailBody, "%s\r\n", mailBody);
-				}
-				else if( strlen(mailBody) < 200 )
-					sprintf(mailBody + strlen(mailBody), "%s\r\n",msg_txt(vsd,814));
-#endif
-				
 			}
 		}
 
@@ -441,16 +398,6 @@ void vending_purchasereq(struct map_session_data* sd, int aid, int uid, const ui
 			if (i==count-1)
 				intif_Mail_send(0, &msg);
 		}
-	}
-
-	// [CreativeSD]: Autovend
-	if( vsd->autovend.account_id ) {
-		msg.zeny = (int)total;
-		safestrncpy(msg.body, mailBody, MAIL_BODY_LENGTH);
-		msg.status = MAIL_NEW;
-		msg.type = MAIL_INBOX_NORMAL;
-		msg.timestamp = time(NULL);
-		intif_Mail_send(0, &msg);
 	}
 
 	// compact the vending list
@@ -545,7 +492,7 @@ int8 vending_openvending(struct map_session_data* sd, const char* message, const
 		||  sd->cart.u.items_cart[index].expire_time // It should not be in the cart but just in case
 		||  (sd->cart.u.items_cart[index].bound && !pc_can_give_bounded_items(sd)) // can't trade account bound items and has no permission
 		||  (sd->cart.u.items_cart[index].card[0]==CARD0_CREATE && (char_id = MakeDWord(sd->cart.u.items_cart[index].card[2],sd->cart.u.items_cart[index].card[3]) == 
-		(battle_config.bg_reserved_char_id || battle_config.woe_reserved_char_id || battle_config.universal_reserved_char_id) && battle_config.reserved_can_trade))
+		(battle_config.bg_reserved_char_id || battle_config.woe_reserved_char_id) && !battle_config.bg_can_trade))
 		// end Brian Bg Items
 		||  !itemdb_cantrade(&sd->cart.u.items_cart[index], pc_get_group_level(sd), pc_get_group_level(sd)) ) // untradeable item
 			continue;
@@ -595,9 +542,6 @@ int8 vending_openvending(struct map_session_data* sd, const char* message, const
 
 	idb_put(vending_db, sd->status.char_id, sd);
 
-	if( battle_config.all_vending_to_autovend || (at && at->autotrade == 2 && battle_config.feature_autovend) )
-		vending_create_autovend(sd);
-
 	return 0;
 }
 
@@ -621,124 +565,6 @@ bool vending_search(struct map_session_data* sd, unsigned short nameid)
 	}
 
 	return true;
-}
-
-/**
- * Create autovend [CreativeSD]
- * @param sd : vender session (player)
- */
-bool vending_create_autovend(struct map_session_data* sd)
-{
-	// Create autovend
-	struct map_session_data* sdd = NULL;
-
-	CREATE(sdd, TBL_PC, 1);
-	memcpy(&sdd->bl, &sd->bl, sizeof(struct block_list));
-	memcpy(&sdd->status, &sd->status, sizeof(struct mmo_charstatus));
-	memcpy(&sdd->status.skill, &sd->status.skill, sizeof(s_skill));
-	memcpy(&sdd->state, &sd->state, sizeof(struct map_session_data::s_state));
-	memcpy(&sdd->vd, &sd->vd, sizeof(struct view_data));
-	memcpy(&sdd->ud, &sd->ud, sizeof(struct unit_data));
-	memcpy(&sdd->sc, &sd->sc, sizeof(struct status_change));
-	memcpy(&sdd->cart, &sd->cart, sizeof(struct s_storage));
-	memcpy(&sdd->base_status, &sd->base_status, sizeof(struct status_data));
-	memcpy(&sdd->battle_status, &sd->battle_status, sizeof(struct status_data));
-
-	sdd->bl.id = map_get_new_bl_id();
-	sdd->bl.prev = NULL;
-	sdd->bl.next = NULL;
-	sdd->status.account_id = sdd->bl.id;
-	sdd->status.char_id = sd->status.char_id;
-
-	sdd->invincible_timer = INVALID_TIMER;
-	sdd->pvp_timer = INVALID_TIMER;
-	sdd->rental_timer = INVALID_TIMER;
-	sdd->followtimer = INVALID_TIMER;
-	sdd->expiration_tid = INVALID_TIMER;
-	sdd->npc_timer_id = INVALID_TIMER;
-	sdd->autotrade_tid = INVALID_TIMER;
-	sdd->autovend.active = true;
-
-	sdd->state.active = 0; //to be set to 1 after player is fully authed and loaded.
-	strcpy(sdd->status.name, sd->status.name);
-	sdd->permissions = sd->permissions;
-
-	sdd->mapindex = sd->mapindex;
-	sdd->bl.x = sd->bl.x;
-	sdd->bl.y = sd->bl.y;
-
-	sdd->status.guild_id = sd->status.guild_id;
-	// guild
-	if (sdd->status.guild_id)
-		guild_send_memberinfoshort(sdd, 1);
-
-	struct map_data *mapdata = map_getmapdata(sdd->bl.m);
-	mapdata->users++;
-	if (!pc_isinvisible(sdd)) { // increment the number of pvp players on the map
-		mapdata->users_pvp++;
-	}
-	sdd->state.debug_remove_map = 0;
-
-	if (map_addblock(&sdd->bl))
-		return 1;
-
-	map_addiddb(&sdd->bl);
-
-	//clif_set_unit_idle(&sdd->bl, false, AREA, &sd->bl);
-	for (int i = 0; i < MAX_CART; i++) {
-		memcpy(&sdd->cart.u.items_cart[i], &sd->cart.u.items_cart[i], sizeof(struct item));
-	}
-
-	int val1 = sd->sc.data[SC_PUSH_CART]->val1;
-	sc_start(&sdd->bl, &sdd->bl, SC_PUSH_CART, 100, val1, 0);
-
-	// Open shop
-	sdd->state.prevend = 0;
-	sdd->state.vending = true;
-	sdd->state.workinprogress = WIP_DISABLE_NONE;
-	sdd->vender_id = sd->vender_id;
-	sdd->vend_num = sd->vend_num;
-	sdd->autovend.account_id = sd->status.account_id;
-	safestrncpy(sdd->message, sd->message, MESSAGE_SIZE);
-	for (int i = 0; i < MAX_VENDING; i++) {
-		sdd->vending[i].index = sd->vending[i].index;
-		sdd->vending[i].amount = sd->vending[i].amount;
-		sdd->vending[i].value = sd->vending[i].value;
-	}
-	sd->vender_id = 0;
-	sd->state.keepshop = true;
-	sd->state.vending = false;
-	clif_showvendingboard(&sdd->bl, sdd->message, 0);
-
-	// effects
-	clif_specialeffect(&sdd->bl, 1000, AREA);
-	clif_specialeffect(&sdd->bl, 1003, AREA);
-
-	// autotrade	
-	sdd->state.autotrade = 1;
-	if (battle_config.autotrade_monsterignore)
-		sdd->state.block_action |= PCBLOCK_IMMUNE;
-
-	if (sdd->state.vending) {
-		if (Sql_Query(mmysql_handle, "UPDATE `%s` SET `autotrade` = 2 WHERE `id` = %d;", vendings_table, sdd->vender_id) != SQL_SUCCESS) {
-			Sql_ShowDebug(mmysql_handle);
-		}
-	}
-	else if (sdd->state.buyingstore) {
-		if (Sql_Query(mmysql_handle, "UPDATE `%s` SET `autotrade` = 2 WHERE `id` = %d;", buyingstores_table, sdd->buyer_id) != SQL_SUCCESS) {
-			Sql_ShowDebug(mmysql_handle);
-		}
-	}
-
-	sdd->state.active = 1;
-
-	channel_pcquit(sd, 0xF); //leave all chan
-	clif_authfail_fd(sd->fd, 15);
-
-	chrif_save(sd, CSAVE_AUTOTRADE);
-
-	map_quit(sd);
-	return 1;
 }
 
 /**
@@ -886,9 +712,9 @@ void do_init_vending_autotrade(void)
 {
 	if (battle_config.feature_autotrade) {
 		if (Sql_Query(mmysql_handle,
-			"SELECT `id`, `account_id`, `char_id`, `sex`, `title`, `body_direction`, `head_direction`, `sit`, `extended_vending_item`, `autotrade` "
+			"SELECT `id`, `account_id`, `char_id`, `sex`, `title`, `body_direction`, `head_direction`, `sit`, `extended_vending_item` "
 			"FROM `%s` "
-			"WHERE (`autotrade` = 1 OR `autotrade` = 2) AND (SELECT COUNT(`vending_id`) FROM `%s` WHERE `vending_id` = `id`) > 0 "
+			"WHERE `autotrade` = 1 AND (SELECT COUNT(`vending_id`) FROM `%s` WHERE `vending_id` = `id`) > 0 "
 			"ORDER BY `id`;",
 			vendings_table, vending_items_table ) != SQL_SUCCESS )
 		{
@@ -917,7 +743,6 @@ void do_init_vending_autotrade(void)
 				Sql_GetData(mmysql_handle, 6, &data, NULL); at->head_dir = atoi(data);
 				Sql_GetData(mmysql_handle, 7, &data, NULL); at->sit = atoi(data);
 				Sql_GetData(mmysql_handle, 8, &data, NULL); at->vend_loot = atoi(data);		// Extended Vending system [Lilith]
-				Sql_GetData(mmysql_handle, 9, &data, NULL); at->autotrade = atoi(data);
 				at->count = 0;
 
 				if (battle_config.feature_autotrade_direction >= 0)

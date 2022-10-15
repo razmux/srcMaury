@@ -672,8 +672,7 @@ struct Battle_Config
 	int bg_eAmod_mode;
 	int bg_reserved_char_id;
 	int woe_reserved_char_id;
-	int universal_reserved_char_id;
-	int reserved_can_trade;
+	int bg_can_trade;
 	int bg_double_login;
 	int bg_team_color;
 	int bg_party_skills;
@@ -689,11 +688,6 @@ struct Battle_Config
 	int bg_kafrapoints; 	//[Oboro]
 	int bg_event_extra_badges; //[Oboro]
 	int bg_win_badges; 		//[Oboro]
-	int bg_ranking_bonus;
-	int bg_ranked_mode;
-	int bg_ranked_max_games;
-	int bg_items_on_pvp;
-
 	// Premium Account System
 	int premium_group_id;
 	int premium_gm;
@@ -702,12 +696,11 @@ struct Battle_Config
 	int premium_gemstone;
 	int premium_job_exp_increase;
 	int premium_base_exp_increase;
-	int premium_announce_delay;
 	//Customs Mavis to eAmod
 	int costume_reserved_char_id;
 	int mob_slave_adddrop;
 	int reflect_damage_fix;
-	// Extended Vending system
+	// Extended Vending system [Lilith]
 	int extended_vending;
 	int show_broadcas_info;
 	int show_item_vending;
@@ -715,12 +708,8 @@ struct Battle_Config
 	int ex_vending_report;
 	int item_zeny;
 	int item_cash;
-	int feature_autovend;
-	int open_autovend_same_account;
-	int all_vending_to_autovend;
 	int unmount_on_damage;
 	int mount_delay;
-	int mvp_pk;
 	int guild_wars;
 	//PvPMode
 	int pvpmode_onlypc;
@@ -733,14 +722,12 @@ struct Battle_Config
 	int aura_pvpmode_enable;
 	int aura_pvpmode_top10;
 	int aura_top10_bg;
-	int devotion_standup_fix;
 	int land_protector_behavior;
 	int no_siege_on_bg;
 	int no_gvg_on_bg;
 	int force_send_bgemblem;
 	int no_noks_boss;
-	int min_guild;
-	int max_guild;
+	int randomoption_script;
 
 #include "../custom/battle_config_struct.inc"
 };
