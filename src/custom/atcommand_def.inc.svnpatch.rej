@@ -1,0 +1,7 @@
+--- src/custom/atcommand_def.inc
++++ src/custom/atcommand_def.inc
+@@ -9,3 +9,4 @@
+  **/
+ 
+ //ACMD_DEF(newcommand),
++ACMD_DEF(autostore),
